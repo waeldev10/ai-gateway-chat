@@ -1,0 +1,35 @@
+<?php
+
+namespace App\Models;
+
+use App\Enums\MessageRole;
+use App\Enums\MessageStatus;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+#[Fillable(['conversation_id', 'role', 'content', 'status'])]
+class Message extends Model
+{
+    use HasUlids;
+
+    protected function casts(): array
+    {
+        return [
+            'role' => MessageRole::class,
+            'status' => MessageStatus::class,
+        ];
+    }
+
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(Conversation::class);
+    }
+
+    public function aiRequests(): HasMany
+    {
+        return $this->hasMany(AiRequest::class);
+    }
+}
