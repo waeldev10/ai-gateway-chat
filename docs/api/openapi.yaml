@@ -1,0 +1,676 @@
+openapi: 3.1.0
+info:
+  title: ai-gateway-chat Authentication API
+  version: 1.0.0
+  description: |
+    Version 1 authentication API for ai-gateway-chat. API clients authenticate
+    with Laravel Sanctum personal access tokens sent as Bearer tokens.
+
+    All success responses use a `data` envelope. Errors use an RFC 9457
+    Problem Details structure with an application error `code`. Validation
+    messages are Arabic.
+
+    Registration, login, and protected endpoints are rate limited. When a limit
+    is exceeded the API returns `429` with the Problem Details response and
+    rate-limit headers.
+  contact:
+    name: ai-gateway-chat
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: /
+    description: Same origin as the application serving this API
+tags:
+  - name: Auth
+    description: Registration, login, token revocation, profile updates, password changes, and the authenticated user profile.
+paths:
+  /api/v1/auth/register:
+    post:
+      tags:
+        - Auth
+      operationId: register
+      summary: Register a user and issue an access token
+      description: |
+        Creates a user, hashes the password, and issues a Sanctum personal
+        access token. The plain-text token is returned only in this response.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              registration:
+                summary: Register a user
+                value:
+                  name: "Example User"
+                  email: "user@example.com"
+                  password: "password"
+                  password_confirmation: "password"
+                  device_name: "mobile-app"
+      responses:
+        '201':
+          description: User registered and access token issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+              examples:
+                created:
+                  summary: Registration succeeded
+                  value:
+                    data:
+                      user:
+                        id: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+                        name: "Example User"
+                        email: "user@example.com"
+                      access_token: "1|examplePlainTextTokenThatIsOnlyReturnedOnce"
+                      token_type: "Bearer"
+                    message: "تم تسجيل الحساب بنجاح."
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Auth
+      operationId: login
+      summary: Authenticate credentials and issue an access token
+      description: |
+        Validates the email and password and issues a Sanctum personal access
+        token. Invalid credentials return a validation error and never reveal
+        whether the email exists.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              login:
+                summary: Log in with email and password
+                value:
+                  email: "user@example.com"
+                  password: "password"
+                  device_name: "web-client"
+      responses:
+        '200':
+          description: Credentials accepted and access token issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+              examples:
+                authenticated:
+                  summary: Login succeeded
+                  value:
+                    data:
+                      user:
+                        id: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+                        name: "Example User"
+                        email: "user@example.com"
+                      access_token: "2|examplePlainTextTokenThatIsOnlyReturnedOnce"
+                      token_type: "Bearer"
+                    message: "تم تسجيل الدخول بنجاح."
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Auth
+      operationId: logout
+      summary: Revoke the current access token
+      description: |
+        Revokes the Sanctum personal access token used for the current request.
+        Other tokens belonging to the user remain valid.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current token revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              examples:
+                loggedOut:
+                  summary: Logout succeeded
+                  value:
+                    data: null
+                    message: "تم تسجيل الخروج بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/auth/logout-all:
+    post:
+      tags:
+        - Auth
+      operationId: logoutAll
+      summary: Revoke every access token for the authenticated user
+      description: |
+        Revokes every Sanctum personal access token belonging to the
+        authenticated user, including the token used for this request. Tokens
+        belonging to other users are not affected.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: All tokens belonging to the authenticated user revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              examples:
+                loggedOutAll:
+                  summary: Logout-all succeeded
+                  value:
+                    data: null
+                    message: "تم إلغاء جميع رموز الوصول بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/auth/me:
+    get:
+      tags:
+        - Auth
+      operationId: getAuthenticatedUser
+      summary: Get the authenticated user
+      description: Returns the authenticated user's public profile fields.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The authenticated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+              examples:
+                currentUser:
+                  summary: Authenticated user
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+                      name: "Example User"
+                      email: "user@example.com"
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/auth/profile:
+    patch:
+      tags:
+        - Auth
+      operationId: updateProfile
+      summary: Update the authenticated user's profile
+      description: |
+        Updates the authenticated user's name and/or email. Changing the email
+        clears email_verified_at.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+            examples:
+              updateProfile:
+                summary: Update name and email
+                value:
+                  name: "Updated User"
+                  email: "updated@example.com"
+      responses:
+        '200':
+          description: Profile updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserMessageResponse'
+              examples:
+                updated:
+                  summary: Profile updated
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+                      name: "Updated User"
+                      email: "updated@example.com"
+                    message: "تم تحديث الملف الشخصي بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    put:
+      tags:
+        - Auth
+      operationId: updateProfileWithPut
+      summary: Update the authenticated user's profile
+      description: |
+        PUT alternative for updating the authenticated user's name and/or email.
+        Changing the email clears email_verified_at.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserMessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/auth/password:
+    put:
+      tags:
+        - Auth
+      operationId: changePassword
+      summary: Change the authenticated user's password
+      description: |
+        Verifies the current password and updates the authenticated user's
+        password hash.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+            examples:
+              changePassword:
+                summary: Change password
+                value:
+                  current_password: "password"
+                  password: "new-password"
+                  password_confirmation: "new-password"
+      responses:
+        '200':
+          description: Password changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              examples:
+                changed:
+                  summary: Password changed
+                  value:
+                    data: null
+                    message: "تم تغيير كلمة المرور بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    patch:
+      tags:
+        - Auth
+      operationId: changePasswordWithPatch
+      summary: Change the authenticated user's password
+      description: |
+        PATCH alternative for verifying the current password and updating the
+        authenticated user's password hash.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum personal access token
+      description: |
+        Send the plain-text token returned by register or login:
+        `Authorization: Bearer {access_token}`.
+  responses:
+    Unauthenticated:
+      description: Authentication is required or the bearer token is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            unauthenticated:
+              summary: Missing or invalid bearer token
+              value:
+                type: "about:blank"
+                title: "Unauthenticated"
+                status: 401
+                detail: "Unauthenticated."
+                code: "unauthenticated"
+    ValidationFailed:
+      description: Request validation failed. Validation messages are Arabic.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblem'
+          examples:
+            validationFailed:
+              summary: Validation errors
+              value:
+                type: "about:blank"
+                title: "Validation Failed"
+                status: 422
+                detail: "بيانات الطلب غير صحيحة."
+                code: "validation_failed"
+                errors:
+                  email:
+                    - "البريد الإلكتروني مطلوب."
+    TooManyRequests:
+      description: A rate limit was exceeded.
+      headers:
+        Retry-After:
+          description: Seconds until the client may retry.
+          schema:
+            type: integer
+        X-RateLimit-Limit:
+          description: Maximum attempts allowed in the current window.
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          description: Attempts remaining in the current window.
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          description: UNIX timestamp when the current window resets.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            tooManyRequests:
+              summary: Rate limit exceeded
+              value:
+                type: "about:blank"
+                title: "Too Many Requests"
+                status: 429
+                detail: "عدد الطلبات كبير جدًا. يرجى المحاولة لاحقًا."
+                code: "rate_limited"
+                retry_after: 60
+    ServerError:
+      description: An unexpected server error occurred. Internal details are not exposed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            serverError:
+              summary: Internal server error
+              value:
+                type: "about:blank"
+                title: "Server Error"
+                status: 500
+                detail: "حدث خطأ غير متوقع. يرجى المحاولة لاحقًا."
+                code: "server_error"
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: string
+          description: ULID primary key.
+          example: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+        name:
+          type: string
+          maxLength: 255
+          example: "Example User"
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: "user@example.com"
+    AuthTokenResponse:
+      type: object
+      required:
+        - data
+        - message
+      properties:
+        data:
+          type: object
+          required:
+            - user
+            - access_token
+            - token_type
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            access_token:
+              type: string
+              description: |
+                Plain-text Sanctum personal access token. It is returned only
+                when the token is issued and must be stored securely by the client.
+              example: "1|examplePlainTextTokenThatIsOnlyReturnedOnce"
+            token_type:
+              type: string
+              const: "Bearer"
+        message:
+          type: string
+          example: "تم تسجيل الدخول بنجاح."
+    UserResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+    MessageResponse:
+      type: object
+      required:
+        - data
+        - message
+      properties:
+        data:
+          type: 'null'
+        message:
+          type: string
+          example: "تم تسجيل الخروج بنجاح."
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - code
+      properties:
+        type:
+          type: string
+          const: "about:blank"
+        title:
+          type: string
+          example: "Validation Failed"
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+          example: 422
+        detail:
+          type: string
+          example: "بيانات الطلب غير صحيحة."
+        code:
+          type: string
+          description: Stable application error code.
+          example: "validation_failed"
+        retry_after:
+          type: integer
+          minimum: 1
+          description: Seconds until the client may retry. Present on rate-limited responses when available.
+          example: 60
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetails'
+        - type: object
+          required:
+            - errors
+          properties:
+            errors:
+              type: object
+              description: Validation errors keyed by request field. Messages are Arabic.
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+              example:
+                email:
+                  - "البريد الإلكتروني مطلوب."
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - email
+        - password
+        - password_confirmation
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: "Example User"
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Normalized to lowercase before validation and persistence.
+          example: "user@example.com"
+        password:
+          type: string
+          minLength: 8
+          writeOnly: true
+          example: "password"
+        password_confirmation:
+          type: string
+          writeOnly: true
+          example: "password"
+        device_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Optional Sanctum token name. Defaults to api-token.
+          example: "mobile-app"
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Normalized to lowercase before authentication.
+          example: "user@example.com"
+        password:
+          type: string
+          writeOnly: true
+          example: "password"
+        device_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Optional Sanctum token name. Defaults to api-token.
+          example: "web-client"
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: "Updated User"
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Normalized to lowercase and unique except for the current user's email.
+          example: "updated@example.com"
+    ChangePasswordRequest:
+      type: object
+      required:
+        - current_password
+        - password
+        - password_confirmation
+      properties:
+        current_password:
+          type: string
+          writeOnly: true
+          example: "password"
+        password:
+          type: string
+          minLength: 8
+          writeOnly: true
+          example: "new-password"
+        password_confirmation:
+          type: string
+          writeOnly: true
+          example: "new-password"
+    UserMessageResponse:
+      type: object
+      required:
+        - data
+        - message
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+        message:
+          type: string
+          example: "تم تحديث الملف الشخصي بنجاح."
