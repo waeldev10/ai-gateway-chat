@@ -6,9 +6,6 @@ use App\Models\User;
 
 class UpdateProfileService
 {
-    /**
-     * @param  array{name?: string, email?: string}  $data
-     */
     public function update(User $user, array $data): User
     {
         if (array_key_exists('name', $data)) {

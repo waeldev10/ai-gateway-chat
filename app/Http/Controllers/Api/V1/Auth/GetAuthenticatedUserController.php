@@ -15,6 +15,7 @@ class GetAuthenticatedUserController extends Controller
      */
     public function __invoke(Request $request): JsonResponse
     {
+
         return ApiResponse::resource(new UserResource($request->user()));
     }
 }

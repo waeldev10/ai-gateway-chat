@@ -33,7 +33,7 @@ class ApiExceptionRenderer
             $exception instanceof AuthenticationException => ApiResponse::problem(
                 401,
                 'Unauthenticated',
-                'يجب تسجيل الدخول أولًا للوصول إلى هذا المورد .',
+                'Unauthenticated.',
                 'unauthenticated',
             ),
             $exception instanceof AuthorizationException => ApiResponse::problem(

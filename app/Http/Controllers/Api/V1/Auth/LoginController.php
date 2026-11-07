@@ -17,6 +17,7 @@ class LoginController extends Controller
      */
     public function __invoke(LoginRequest $request, LoginService $service): JsonResponse
     {
+
         $user = $service->authenticate($request->safe()->only(['email', 'password']));
 
         if ($user === null) {
