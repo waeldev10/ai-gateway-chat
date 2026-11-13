@@ -43,11 +43,6 @@ class User extends Authenticatable
         return $this->hasMany(AiPersona::class);
     }
 
-    public function aiMemories(): HasMany
-    {
-        return $this->hasMany(AiMemory::class);
-    }
-
     public function aiRequests(): HasMany
     {
         return $this->hasMany(AiRequest::class);

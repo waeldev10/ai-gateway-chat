@@ -45,8 +45,20 @@ class ApiExceptionRenderer
             $exception instanceof ModelNotFoundException => ApiResponse::problem(
                 404,
                 'Not Found',
-                'المورد المطلوب غير موجود.',
+                'تعذر العثور على المورد المطلوب.',
                 'not_found',
+            ),
+            $exception instanceof ConversationBusyException => ApiResponse::problem(
+                409,
+                'Conversation Busy',
+                $exception->getMessage(),
+                $exception->problemCode,
+            ),
+            $exception instanceof AiException => ApiResponse::problem(
+                502,
+                'AI Provider Error',
+                'تعذر الحصول على رد من مزود الذكاء الاصطناعي. يرجى المحاولة لاحقًا.',
+                'provider_failed',
             ),
             $exception instanceof HttpExceptionInterface => $this->renderHttpException($exception),
             default => ApiResponse::problem(
@@ -70,7 +82,7 @@ class ApiExceptionRenderer
 
         [$title, $detail, $code] = match ($status) {
             400 => ['Bad Request', 'تعذر معالجة الطلب.', 'bad_request'],
-            401 => ['Unauthenticated', 'Unauthenticated.', 'unauthenticated'],
+            401 => ['Unauthenticated', 'يجب عليك تسجيل الدخول اولا.', 'unauthenticated'],
             403 => ['Forbidden', 'ليس لديك صلاحية لتنفيذ هذا الإجراء.', 'forbidden'],
             404 => ['Not Found', 'المسار المطلوب غير موجود.', 'not_found'],
             405 => ['Method Not Allowed', 'طريقة HTTP غير مدعومة لهذا المسار.', 'method_not_allowed'],

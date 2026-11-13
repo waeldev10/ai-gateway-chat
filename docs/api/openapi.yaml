@@ -1,18 +1,19 @@
 openapi: 3.1.0
 info:
-  title: ai-gateway-chat Authentication API
+  title: ai-gateway-chat API
   version: 1.0.0
   description: |
-    Version 1 authentication API for ai-gateway-chat. API clients authenticate
-    with Laravel Sanctum personal access tokens sent as Bearer tokens.
+    Version 1 API for ai-gateway-chat. API clients authenticate with Laravel
+    Sanctum personal access tokens sent as Bearer tokens.
 
     All success responses use a `data` envelope. Errors use an RFC 9457
     Problem Details structure with an application error `code`. Validation
     messages are Arabic.
 
-    Registration, login, and protected endpoints are rate limited. When a limit
-    is exceeded the API returns `429` with the Problem Details response and
-    rate-limit headers.
+    Public endpoints are registration and login. Every other endpoint requires
+    a valid bearer token. Conversations and messages are restricted to their
+    owner. The system default persona is visible to every authenticated user
+    but cannot be modified.
   contact:
     name: ai-gateway-chat
   license:
@@ -24,6 +25,12 @@ servers:
 tags:
   - name: Auth
     description: Registration, login, token revocation, profile updates, password changes, and the authenticated user profile.
+  - name: Conversations
+    description: Conversation listing, search, creation, retrieval, updates, deletion, bulk deletion, pinning, and unpinning.
+  - name: Messages
+    description: Message listing, sending, continuation, editing, and regeneration.
+  - name: Personas
+    description: AI persona listing, creation, retrieval, updates, deletion, activation, and deactivation.
 paths:
   /api/v1/auth/register:
     post:
@@ -141,7 +148,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/ActionResponse'
               examples:
                 loggedOut:
                   summary: Logout succeeded
@@ -172,7 +179,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/ActionResponse'
               examples:
                 loggedOutAll:
                   summary: Logout-all succeeded
@@ -323,7 +330,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/ActionResponse'
               examples:
                 changed:
                   summary: Password changed
@@ -360,11 +367,1137 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/ActionResponse'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '422':
           $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/conversations:
+    get:
+      tags:
+        - Conversations
+      operationId: listConversations
+      summary: List the authenticated user's conversations
+      description: |
+        Returns only conversations owned by the authenticated user, paginated
+        by page number. Pinned conversations are returned first, followed by
+        conversations ordered by updated_at and id descending.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/QQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+        - $ref: '#/components/parameters/PageQuery'
+      responses:
+        '200':
+          description: Paginated conversations owned by the authenticated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationListResponse'
+              examples:
+                conversations:
+                  summary: Conversation list
+                  value:
+                    data:
+                      - id: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+                        title: "Planning a trip to Japan"
+                        is_pinned: true
+                        pinned_at: "2026-11-12T09:00:00+00:00"
+                        created_at: "2026-11-10T08:30:00+00:00"
+                        updated_at: "2026-11-12T09:00:00+00:00"
+                    links:
+                      first: "https://example.test/api/v1/conversations?page=1"
+                      last: "https://example.test/api/v1/conversations?page=1"
+                      prev: null
+                      next: null
+                    meta:
+                      path: "https://example.test/api/v1/conversations"
+                      current_page: 1
+                      from: 1
+                      last_page: 1
+                      per_page: 15
+                      to: 1
+                      total: 1
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags:
+        - Conversations
+      operationId: createConversation
+      summary: Create a conversation
+      description: Creates a conversation owned by the authenticated user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoreConversationRequest'
+            examples:
+              createConversation:
+                summary: Create a titled conversation
+                value:
+                  title: "Planning a trip"
+      responses:
+        '201':
+          description: Conversation created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+              examples:
+                created:
+                  summary: Conversation created
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+                      title: "Planning a trip"
+                      is_pinned: false
+                      pinned_at: null
+                      created_at: "2026-11-13T10:00:00+00:00"
+                      updated_at: "2026-11-13T10:00:00+00:00"
+                    message: "تم إنشاء المحادثة بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags:
+        - Conversations
+      operationId: deleteConversations
+      summary: Bulk delete conversations
+      description: |
+        Deletes up to 50 selected conversations and their messages in one
+        transaction. The operation is all-or-nothing: if any ID is missing or
+        belongs to another user, nothing is deleted and the API returns 403.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkDeleteConversationsRequest'
+            examples:
+              bulkDelete:
+                summary: Delete two conversations
+                value:
+                  ids:
+                    - "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+                    - "01JZ9M0R6V8X3K4P5Q7S9T2W6B"
+      responses:
+        '200':
+          description: Selected conversations deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResponse'
+              examples:
+                deleted:
+                  summary: Bulk deletion succeeded
+                  value:
+                    data: null
+                    message: "تم حذف المحادثات المحددة بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/ConversationBusy'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/conversations/search:
+    get:
+      tags:
+        - Conversations
+      operationId: searchConversations
+      summary: Search the authenticated user's conversations
+      description: |
+        Behaves like conversation listing. Use q or search to filter the
+        authenticated user's conversations by title. q is used only when search
+        is absent.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/QQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+        - $ref: '#/components/parameters/PageQuery'
+      responses:
+        '200':
+          description: Paginated matching conversations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/conversations/{conversation}:
+    get:
+      tags:
+        - Conversations
+      operationId: showConversation
+      summary: Get a conversation
+      description: Returns conversation metadata without embedded messages.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '200':
+          description: The conversation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    patch:
+      tags:
+        - Conversations
+      operationId: updateConversation
+      summary: Rename a conversation
+      description: Updates the conversation title.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConversationRequest'
+            examples:
+              rename:
+                summary: Rename a conversation
+                value:
+                  title: "New title"
+      responses:
+        '200':
+          description: Conversation updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+              examples:
+                updated:
+                  summary: Conversation renamed
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+                      title: "New title"
+                      is_pinned: false
+                      pinned_at: null
+                      created_at: "2026-11-13T10:00:00+00:00"
+                      updated_at: "2026-11-13T10:05:00+00:00"
+                    message: "تم تحديث المحادثة بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    put:
+      tags:
+        - Conversations
+      operationId: updateConversationWithPut
+      summary: Rename a conversation
+      description: PUT alternative for updating the conversation title.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConversationRequest'
+      responses:
+        '200':
+          description: Conversation updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags:
+        - Conversations
+      operationId: deleteConversation
+      summary: Delete a conversation
+      description: |
+        Deletes the conversation and its messages. AI request audit rows are
+        retained with their conversation and message references cleared.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '200':
+          description: Conversation deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResponse'
+              examples:
+                deleted:
+                  summary: Conversation deleted
+                  value:
+                    data: null
+                    message: "تم حذف المحادثة بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ConversationBusy'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/conversations/{conversation}/pin:
+    post:
+      tags:
+        - Conversations
+      operationId: pinConversation
+      summary: Pin a conversation
+      description: |
+        Pins the conversation. Pinning an already pinned conversation does not
+        change pinned_at.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '200':
+          description: Conversation pinned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+              examples:
+                pinned:
+                  summary: Conversation pinned
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+                      title: "Planning a trip"
+                      is_pinned: true
+                      pinned_at: "2026-11-13T10:10:00+00:00"
+                      created_at: "2026-11-13T10:00:00+00:00"
+                      updated_at: "2026-11-13T10:10:00+00:00"
+                    message: "تم تثبيت المحادثة بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags:
+        - Conversations
+      operationId: unpinConversation
+      summary: Unpin a conversation
+      description: |
+        Removes the pin from the conversation. Unpinning a conversation that is
+        not pinned is a no-op.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '200':
+          description: Conversation unpinned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+              examples:
+                unpinned:
+                  summary: Conversation unpinned
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+                      title: "Planning a trip"
+                      is_pinned: false
+                      pinned_at: null
+                      created_at: "2026-11-13T10:00:00+00:00"
+                      updated_at: "2026-11-13T10:10:00+00:00"
+                    message: "تم إلغاء تثبيت المحادثة بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/conversations/{conversation}/messages:
+    get:
+      tags:
+        - Messages
+      operationId: listMessages
+      summary: List messages in a conversation
+      description: |
+        Returns messages for a conversation using cursor pagination. The newest
+        page is returned first, but messages within each page are ordered
+        chronologically. All message statuses are included.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/CursorQuery'
+      responses:
+        '200':
+          description: Cursor-paginated messages.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageListResponse'
+              examples:
+                messages:
+                  summary: A page of messages
+                  value:
+                    data:
+                      - id: "01JZ9M0R6V8X3K4P5Q7S9T2W6B"
+                        role: "user"
+                        content: "What should I pack?"
+                        status: "complete"
+                        created_at: "2026-11-13T10:14:00+00:00"
+                        updated_at: "2026-11-13T10:14:00+00:00"
+                      - id: "01JZ9M0R6V8X3K4P5Q7S9T2W6C"
+                        role: "assistant"
+                        content: "Pack layers, comfortable shoes, and a rain jacket."
+                        status: "complete"
+                        created_at: "2026-11-13T10:14:05+00:00"
+                        updated_at: "2026-11-13T10:14:05+00:00"
+                    links:
+                      first: null
+                      last: null
+                      prev: null
+                      next: null
+                    meta:
+                      path: "https://example.test/api/v1/conversations/01JZ9M0R6V8X3K4P5Q7S9T2W6A/messages"
+                      per_page: 25
+                      next_cursor: null
+                      prev_cursor: null
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags:
+        - Messages
+      operationId: sendMessage
+      summary: Send a message and generate an assistant reply
+      description: |
+        Persists a complete user message and generates a complete assistant
+        reply. If the conversation title is blank, the first user message titles
+        it. If the AI provider fails, the user message remains persisted, no
+        assistant message is created, and the API returns 502.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+            examples:
+              sendMessage:
+                summary: Send a message
+                value:
+                  content: "Hello there"
+                  persona_id: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+      responses:
+        '201':
+          description: User message persisted and assistant reply generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageExchangeResponse'
+              examples:
+                sent:
+                  summary: Message exchange created
+                  value:
+                    data:
+                      user_message:
+                        id: "01JZ9M0R6V8X3K4P5Q7S9T2W6B"
+                        role: "user"
+                        content: "Hello there"
+                        status: "complete"
+                        created_at: "2026-11-13T10:14:00+00:00"
+                        updated_at: "2026-11-13T10:14:00+00:00"
+                      assistant_message:
+                        id: "01JZ9M0R6V8X3K4P5Q7S9T2W6C"
+                        role: "assistant"
+                        content: "Hello, how can I help?"
+                        status: "complete"
+                        created_at: "2026-11-13T10:14:05+00:00"
+                        updated_at: "2026-11-13T10:14:05+00:00"
+                    message: "تم إرسال الرسالة بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ConversationBusy'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '502':
+          $ref: '#/components/responses/ProviderFailed'
+  /api/v1/conversations/{conversation}/messages/continue:
+    post:
+      tags:
+        - Messages
+      operationId: continueConversation
+      summary: Continue a conversation
+      description: |
+        Generates a new assistant reply from completed message history without
+        adding a new user message. Fails with 422 when there are no completed
+        messages or when the latest message is still pending.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContinueConversationRequest'
+            examples:
+              continue:
+                summary: Continue with a persona
+                value:
+                  persona_id: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+      responses:
+        '200':
+          description: Assistant reply generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              examples:
+                continued:
+                  summary: Continuation succeeded
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6C"
+                      role: "assistant"
+                      content: "Continued answer"
+                      status: "complete"
+                      created_at: "2026-11-13T10:15:00+00:00"
+                      updated_at: "2026-11-13T10:15:00+00:00"
+                    message: "تم متابعة المحادثة بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ConversationBusy'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '502':
+          $ref: '#/components/responses/ProviderFailed'
+  /api/v1/conversations/{conversation}/messages/{message}:
+    patch:
+      tags:
+        - Messages
+      operationId: updateMessage
+      summary: Edit a user message and regenerate its reply
+      description: |
+        Edits a user message and regenerates its immediate assistant reply. If
+        the user message is the latest message, an assistant reply is created.
+        Later messages are preserved. Editing an assistant message returns 403.
+        If the next message is not an assistant message, the edit fails with
+        422. Provider failure rolls back the user edit and assistant replacement.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/MessageId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMessageRequest'
+            examples:
+              editMessage:
+                summary: Edit a user message
+                value:
+                  content: "Edited question"
+      responses:
+        '200':
+          description: Message edited and assistant reply regenerated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageExchangeResponse'
+              examples:
+                edited:
+                  summary: Message edited
+                  value:
+                    data:
+                      user_message:
+                        id: "01JZ9M0R6V8X3K4P5Q7S9T2W6B"
+                        role: "user"
+                        content: "Edited question"
+                        status: "complete"
+                        created_at: "2026-11-13T10:14:00+00:00"
+                        updated_at: "2026-11-13T10:16:00+00:00"
+                      assistant_message:
+                        id: "01JZ9M0R6V8X3K4P5Q7S9T2W6C"
+                        role: "assistant"
+                        content: "Edited answer"
+                        status: "complete"
+                        created_at: "2026-11-13T10:14:05+00:00"
+                        updated_at: "2026-11-13T10:16:00+00:00"
+                    message: "تم تعديل الرسالة بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ConversationBusy'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '502':
+          $ref: '#/components/responses/ProviderFailed'
+    put:
+      tags:
+        - Messages
+      operationId: updateMessageWithPut
+      summary: Edit a user message and regenerate its reply
+      description: |
+        PUT alternative for editing a user message and regenerating its
+        immediate assistant reply.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/MessageId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMessageRequest'
+      responses:
+        '200':
+          description: Message edited and assistant reply regenerated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageExchangeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ConversationBusy'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '502':
+          $ref: '#/components/responses/ProviderFailed'
+  /api/v1/conversations/{conversation}/messages/{message}/regenerate:
+    post:
+      tags:
+        - Messages
+      operationId: regenerateMessage
+      summary: Regenerate an assistant response
+      description: |
+        Regenerates an assistant message in place, or the assistant reply
+        following a user message. A user target must be complete. When the user
+        target is the latest message, a new assistant reply is created. Provider
+        failure leaves every message unchanged.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/MessageId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegenerateMessageRequest'
+            examples:
+              regenerate:
+                summary: Regenerate with a persona
+                value:
+                  persona_id: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+      responses:
+        '200':
+          description: Assistant response regenerated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              examples:
+                regenerated:
+                  summary: Response regenerated
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6C"
+                      role: "assistant"
+                      content: "Fresh answer"
+                      status: "complete"
+                      created_at: "2026-11-13T10:14:05+00:00"
+                      updated_at: "2026-11-13T10:17:00+00:00"
+                    message: "تم إعادة توليد الرد بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ConversationBusy'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '502':
+          $ref: '#/components/responses/ProviderFailed'
+  /api/v1/personas:
+    get:
+      tags:
+        - Personas
+      operationId: listPersonas
+      summary: List visible personas
+      description: |
+        Returns the system default persona followed by the authenticated user's
+        custom personas. This endpoint is not paginated.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Visible personas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonaListResponse'
+              examples:
+                personas:
+                  summary: System default and custom persona
+                  value:
+                    data:
+                      - id: "01JZ9M0R6V8X3K4P5Q7S9T2W60"
+                        name: "Default Assistant"
+                        system_prompt: "You are a helpful AI assistant. Answer clearly and concisely, and match the user language."
+                        is_active: true
+                        is_system: true
+                        created_at: "2026-11-01T00:00:00+00:00"
+                        updated_at: "2026-11-01T00:00:00+00:00"
+                      - id: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+                        name: "Code Reviewer"
+                        system_prompt: "Review code carefully and explain tradeoffs."
+                        is_active: true
+                        is_system: false
+                        created_at: "2026-11-10T09:00:00+00:00"
+                        updated_at: "2026-11-10T09:00:00+00:00"
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags:
+        - Personas
+      operationId: createPersona
+      summary: Create a custom persona
+      description: |
+        Creates a custom persona owned by the authenticated user. The name is
+        trimmed and whitespace-squished. The system prompt is trimmed and line
+        endings are normalized. Creation is limited by the configured maximum
+        number of custom personas.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StorePersonaRequest'
+            examples:
+              createPersona:
+                summary: Create a custom persona
+                value:
+                  name: "Code Reviewer"
+                  system_prompt: "Review code carefully.\nExplain tradeoffs."
+                  is_active: true
+      responses:
+        '201':
+          description: Persona created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonaResponse'
+              examples:
+                created:
+                  summary: Persona created
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+                      name: "Code Reviewer"
+                      system_prompt: "Review code carefully.\nExplain tradeoffs."
+                      is_active: true
+                      is_system: false
+                      created_at: "2026-11-13T10:20:00+00:00"
+                      updated_at: "2026-11-13T10:20:00+00:00"
+                    message: "تم إنشاء الشخصية بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/personas/{persona}:
+    get:
+      tags:
+        - Personas
+      operationId: showPersona
+      summary: Get a persona
+      description: |
+        Returns a visible persona. The system default persona is visible to
+        every authenticated user; custom personas are visible only to their
+        owner.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonaId'
+      responses:
+        '200':
+          description: The persona.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonaResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    patch:
+      tags:
+        - Personas
+      operationId: updatePersona
+      summary: Update a custom persona
+      description: |
+        Updates an owned custom persona. The system default persona cannot be
+        updated. All body fields are optional, but when present they are
+        validated.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePersonaRequest'
+            examples:
+              updatePersona:
+                summary: Update a persona
+                value:
+                  name: "Updated Persona"
+                  system_prompt: "Updated instructions."
+                  is_active: false
+      responses:
+        '200':
+          description: Persona updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonaResponse'
+              examples:
+                updated:
+                  summary: Persona updated
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+                      name: "Updated Persona"
+                      system_prompt: "Updated instructions."
+                      is_active: false
+                      is_system: false
+                      created_at: "2026-11-13T10:20:00+00:00"
+                      updated_at: "2026-11-13T10:25:00+00:00"
+                    message: "تم تحديث الشخصية بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    put:
+      tags:
+        - Personas
+      operationId: updatePersonaWithPut
+      summary: Update a custom persona
+      description: PUT alternative for updating an owned custom persona.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePersonaRequest'
+      responses:
+        '200':
+          description: Persona updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonaResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags:
+        - Personas
+      operationId: deletePersona
+      summary: Delete a custom persona
+      description: |
+        Deletes an owned custom persona. The system default persona cannot be
+        deleted.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonaId'
+      responses:
+        '200':
+          description: Persona deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResponse'
+              examples:
+                deleted:
+                  summary: Persona deleted
+                  value:
+                    data: null
+                    message: "تم حذف الشخصية بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/personas/{persona}/activate:
+    post:
+      tags:
+        - Personas
+      operationId: activatePersona
+      summary: Activate a custom persona
+      description: |
+        Activates an owned custom persona. Activating an already active persona
+        is a no-op. The system default persona cannot be activated through this
+        endpoint.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonaId'
+      responses:
+        '200':
+          description: Persona activated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonaResponse'
+              examples:
+                activated:
+                  summary: Persona activated
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+                      name: "Code Reviewer"
+                      system_prompt: "Review code carefully and explain tradeoffs."
+                      is_active: true
+                      is_system: false
+                      created_at: "2026-11-13T10:20:00+00:00"
+                      updated_at: "2026-11-13T10:26:00+00:00"
+                    message: "تم تفعيل الشخصية بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/personas/{persona}/deactivate:
+    post:
+      tags:
+        - Personas
+      operationId: deactivatePersona
+      summary: Deactivate a custom persona
+      description: |
+        Deactivates an owned custom persona. Deactivating an already inactive
+        persona is a no-op. The system default persona cannot be deactivated.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PersonaId'
+      responses:
+        '200':
+          description: Persona deactivated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonaResponse'
+              examples:
+                deactivated:
+                  summary: Persona deactivated
+                  value:
+                    data:
+                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+                      name: "Code Reviewer"
+                      system_prompt: "Review code carefully and explain tradeoffs."
+                      is_active: false
+                      is_system: false
+                      created_at: "2026-11-13T10:20:00+00:00"
+                      updated_at: "2026-11-13T10:27:00+00:00"
+                    message: "تم تعطيل الشخصية بنجاح."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -378,6 +1511,85 @@ components:
       description: |
         Send the plain-text token returned by register or login:
         `Authorization: Bearer {access_token}`.
+  parameters:
+    ConversationId:
+      name: conversation
+      in: path
+      required: true
+      description: Conversation identifier.
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    MessageId:
+      name: message
+      in: path
+      required: true
+      description: Message identifier within the parent conversation.
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    PersonaId:
+      name: persona
+      in: path
+      required: true
+      description: Persona identifier.
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    SearchQuery:
+      name: search
+      in: query
+      required: false
+      description: Filters the authenticated user's conversations by title.
+      schema:
+        type: string
+        maxLength: 255
+      example: "Japan"
+    QQuery:
+      name: q
+      in: query
+      required: false
+      description: Alias for search. Used only when search is absent.
+      schema:
+        type: string
+        maxLength: 255
+      example: "study"
+    PerPageQuery:
+      name: per_page
+      in: query
+      required: false
+      description: Number of conversations per page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 15
+      example: 15
+    PageQuery:
+      name: page
+      in: query
+      required: false
+      description: Page number.
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      description: Number of messages per page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+      example: 25
+    CursorQuery:
+      name: cursor
+      in: query
+      required: false
+      description: Cursor from meta.next_cursor or meta.prev_cursor.
+      schema:
+        type: string
+      example: "eyJpZCI6IjAxSlo5TTBSNlY4WDNLNFA1UTdTOVQyVzZBIn0"
   responses:
     Unauthenticated:
       description: Authentication is required or the bearer token is invalid.
@@ -394,6 +1606,36 @@ components:
                 status: 401
                 detail: "Unauthenticated."
                 code: "unauthenticated"
+    Forbidden:
+      description: The authenticated user may not perform the action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            forbidden:
+              summary: Ownership or policy check failed
+              value:
+                type: "about:blank"
+                title: "Forbidden"
+                status: 403
+                detail: "ليس لديك صلاحية لتنفيذ هذا الإجراء."
+                code: "forbidden"
+    NotFound:
+      description: The requested route or model was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            notFound:
+              summary: Conversation, message, or persona not found
+              value:
+                type: "about:blank"
+                title: "Not Found"
+                status: 404
+                detail: "تعذر العثور على المورد المطلوب."
+                code: "not_found"
     ValidationFailed:
       description: Request validation failed. Validation messages are Arabic.
       content:
@@ -410,8 +1652,38 @@ components:
                 detail: "بيانات الطلب غير صحيحة."
                 code: "validation_failed"
                 errors:
-                  email:
-                    - "البريد الإلكتروني مطلوب."
+                  content:
+                    - "المحتوى مطلوب."
+    ConversationBusy:
+      description: Another operation is currently running on the conversation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            conversationBusy:
+              summary: Conversation operation lock is held
+              value:
+                type: "about:blank"
+                title: "Conversation Busy"
+                status: 409
+                detail: "هناك عملية أخرى قيد التنفيذ على هذه المحادثة. يرجى إعادة المحاولة لاحقاً."
+                code: "conversation_busy"
+    ProviderFailed:
+      description: The configured AI provider could not produce a response.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            providerFailed:
+              summary: AI provider failure
+              value:
+                type: "about:blank"
+                title: "AI Provider Error"
+                status: 502
+                detail: "تعذر الحصول على رد من مزود الذكاء الاصطناعي. يرجى المحاولة لاحقًا."
+                code: "provider_failed"
     TooManyRequests:
       description: A rate limit was exceeded.
       headers:
@@ -461,6 +1733,11 @@ components:
                 detail: "حدث خطأ غير متوقع. يرجى المحاولة لاحقًا."
                 code: "server_error"
   schemas:
+    Ulid:
+      type: string
+      description: ULID resource identifier.
+      pattern: '^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$'
+      example: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
     User:
       type: object
       required:
@@ -469,9 +1746,7 @@ components:
         - email
       properties:
         id:
-          type: string
-          description: ULID primary key.
-          example: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+          $ref: '#/components/schemas/Ulid'
         name:
           type: string
           maxLength: 255
@@ -515,7 +1790,18 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/User'
-    MessageResponse:
+    UserMessageResponse:
+      type: object
+      required:
+        - data
+        - message
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+        message:
+          type: string
+          example: "تم تحديث الملف الشخصي بنجاح."
+    ActionResponse:
       type: object
       required:
         - data
@@ -525,7 +1811,327 @@ components:
           type: 'null'
         message:
           type: string
-          example: "تم تسجيل الخروج بنجاح."
+          example: "تم حذف المحادثة بنجاح."
+    Conversation:
+      type: object
+      required:
+        - id
+        - title
+        - is_pinned
+        - pinned_at
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        title:
+          type:
+            - string
+            - 'null'
+          maxLength: 255
+          example: "Planning a trip"
+        is_pinned:
+          type: boolean
+          example: false
+        pinned_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          example: "2026-11-12T09:00:00+00:00"
+        created_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          example: "2026-11-10T08:30:00+00:00"
+        updated_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          example: "2026-11-12T09:00:00+00:00"
+    ConversationResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/Conversation'
+        message:
+          type: string
+          example: "تم تحديث المحادثة بنجاح."
+    PageLinks:
+      type: object
+      required:
+        - first
+        - last
+        - prev
+        - next
+      properties:
+        first:
+          type:
+            - string
+            - 'null'
+          format: uri
+        last:
+          type:
+            - string
+            - 'null'
+          format: uri
+        prev:
+          type:
+            - string
+            - 'null'
+          format: uri
+        next:
+          type:
+            - string
+            - 'null'
+          format: uri
+    PageMeta:
+      type: object
+      required:
+        - path
+        - current_page
+        - from
+        - last_page
+        - per_page
+        - to
+        - total
+      properties:
+        path:
+          type: string
+          format: uri
+        current_page:
+          type: integer
+          minimum: 1
+        from:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+        last_page:
+          type: integer
+          minimum: 1
+        per_page:
+          type: integer
+          minimum: 1
+        to:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+    ConversationListResponse:
+      type: object
+      required:
+        - data
+        - links
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Conversation'
+        links:
+          $ref: '#/components/schemas/PageLinks'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+    CursorLinks:
+      type: object
+      required:
+        - first
+        - last
+        - prev
+        - next
+      properties:
+        first:
+          type: 'null'
+        last:
+          type: 'null'
+        prev:
+          type:
+            - string
+            - 'null'
+          format: uri
+        next:
+          type:
+            - string
+            - 'null'
+          format: uri
+    CursorMeta:
+      type: object
+      required:
+        - path
+        - per_page
+        - next_cursor
+        - prev_cursor
+      properties:
+        path:
+          type: string
+          format: uri
+        per_page:
+          type: integer
+          minimum: 1
+        next_cursor:
+          type:
+            - string
+            - 'null'
+        prev_cursor:
+          type:
+            - string
+            - 'null'
+    MessageRole:
+      type: string
+      enum:
+        - user
+        - assistant
+        - system
+    MessageStatus:
+      type: string
+      enum:
+        - pending
+        - complete
+        - failed
+        - cancelled
+    Message:
+      type: object
+      required:
+        - id
+        - role
+        - content
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        role:
+          $ref: '#/components/schemas/MessageRole'
+        content:
+          type: string
+          example: "Hello there"
+        status:
+          $ref: '#/components/schemas/MessageStatus'
+        created_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          example: "2026-11-13T10:14:00+00:00"
+        updated_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          example: "2026-11-13T10:14:00+00:00"
+    MessageResponse:
+      type: object
+      required:
+        - data
+        - message
+      properties:
+        data:
+          $ref: '#/components/schemas/Message'
+        message:
+          type: string
+          example: "تم متابعة المحادثة بنجاح."
+    MessageExchange:
+      type: object
+      required:
+        - user_message
+        - assistant_message
+      properties:
+        user_message:
+          $ref: '#/components/schemas/Message'
+        assistant_message:
+          $ref: '#/components/schemas/Message'
+    MessageExchangeResponse:
+      type: object
+      required:
+        - data
+        - message
+      properties:
+        data:
+          $ref: '#/components/schemas/MessageExchange'
+        message:
+          type: string
+          example: "تم إرسال الرسالة بنجاح."
+    MessageListResponse:
+      type: object
+      required:
+        - data
+        - links
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        links:
+          $ref: '#/components/schemas/CursorLinks'
+        meta:
+          $ref: '#/components/schemas/CursorMeta'
+    Persona:
+      type: object
+      required:
+        - id
+        - name
+        - system_prompt
+        - is_active
+        - is_system
+        - created_at
+        - updated_at
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        name:
+          type: string
+          maxLength: 100
+          example: "Code Reviewer"
+        system_prompt:
+          type: string
+          example: "Review code carefully and explain tradeoffs."
+        is_active:
+          type: boolean
+          example: true
+        is_system:
+          type: boolean
+          readOnly: true
+          description: True for the system default persona; false for custom personas.
+          example: false
+        created_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updated_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    PersonaResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/Persona'
+        message:
+          type: string
+          example: "تم تحديث الشخصية بنجاح."
+    PersonaListResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Persona'
     ProblemDetails:
       type: object
       required:
@@ -573,8 +2179,8 @@ components:
                 items:
                   type: string
               example:
-                email:
-                  - "البريد الإلكتروني مطلوب."
+                content:
+                  - "المحتوى مطلوب."
     RegisterRequest:
       type: object
       required:
@@ -663,14 +2269,126 @@ components:
           type: string
           writeOnly: true
           example: "new-password"
-    UserMessageResponse:
+    StoreConversationRequest:
+      type: object
+      properties:
+        title:
+          type:
+            - string
+            - 'null'
+          maxLength: 255
+          example: "Planning a trip"
+    UpdateConversationRequest:
       type: object
       required:
-        - data
-        - message
+        - title
       properties:
-        data:
-          $ref: '#/components/schemas/User'
-        message:
+        title:
           type: string
-          example: "تم تحديث الملف الشخصي بنجاح."
+          maxLength: 255
+          example: "New title"
+    BulkDeleteConversationsRequest:
+      type: object
+      required:
+        - ids
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          maxItems: 50
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Ulid'
+          example:
+            - "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+            - "01JZ9M0R6V8X3K4P5Q7S9T2W6B"
+    SendMessageRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          example: "Hello there"
+        persona_id:
+          type:
+            - string
+            - 'null'
+          pattern: "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          description: Optional visible persona identifier.
+          example: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+    ContinueConversationRequest:
+      type: object
+      properties:
+        persona_id:
+          type:
+            - string
+            - 'null'
+          pattern: "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          description: Optional visible persona identifier.
+          example: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+    UpdateMessageRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          example: "Edited question"
+        persona_id:
+          type:
+            - string
+            - 'null'
+          pattern: "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          description: Optional visible persona identifier.
+          example: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+    RegenerateMessageRequest:
+      type: object
+      properties:
+        persona_id:
+          type:
+            - string
+            - 'null'
+          pattern: "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          description: Optional visible persona identifier.
+          example: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+    StorePersonaRequest:
+      type: object
+      required:
+        - name
+        - system_prompt
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "Code Reviewer"
+        system_prompt:
+          type: string
+          minLength: 1
+          maxLength: 8000
+          example: "Review code carefully and explain tradeoffs."
+        is_active:
+          type: boolean
+          default: true
+          example: true
+    UpdatePersonaRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "Updated Persona"
+        system_prompt:
+          type: string
+          minLength: 1
+          maxLength: 8000
+          example: "Updated instructions."
+        is_active:
+          type: boolean
+          example: false

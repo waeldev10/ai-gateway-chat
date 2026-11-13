@@ -33,6 +33,24 @@ final class ApiResponse
     /**
      * @param  array<string, mixed>  $headers
      */
+    public static function paginated(
+        ResourceCollection $collection,
+        ?string $message = null,
+        int $status = 200,
+        array $headers = [],
+    ): JsonResponse {
+        $payload = $collection->response()->getData(true);
+
+        if ($message !== null) {
+            $payload['message'] = $message;
+        }
+
+        return response()->json($payload, $status, $headers);
+    }
+
+    /**
+     * @param  array<string, mixed>  $headers
+     */
     public static function action(
         ?string $message = null,
         int $status = 200,

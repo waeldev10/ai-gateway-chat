@@ -14,29 +14,7 @@ return [
     |
     */
 
-    'default' => env('AI_CONNECTION', 'openai'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | AI Connections
-    |--------------------------------------------------------------------------
-    |
-    | Each connection defines the protocol driver, credentials, endpoint,
-    | and default model used by the AI layer. The "driver" value is a
-    | protocol identifier, not a company name. Providers that expose a
-    | compatible protocol share the same driver implementation.
-    |
-    | Supported drivers:
-    | - chat-completions      OpenAI Chat Completions protocol
-    | - responses             OpenAI Responses protocol
-    | - anthropic-messages    Anthropic Messages protocol
-    | - gemini-interactions   Google Gemini Interactions API
-    |
-    | Every connection accepts a <PREFIX>_DRIVER environment variable so the
-    | protocol can be changed without editing application code. There is no
-    | global driver override; each connection selects its own driver.
-    |
-    */
+    'default' => env('AI_CONNECTION', 'openrouter'),
 
     'connections' => [
 
@@ -146,6 +124,21 @@ return [
             'timeout' => (int) env('GROK_TIMEOUT', 60),
         ],
 
+    ],
+
+    'personas' => [
+
+        'max_custom' => (int) env('AI_PERSONAS_MAX_CUSTOM', 3),
+
+        'max_name_length' => (int) env('AI_PERSONAS_MAX_NAME_LENGTH', 100),
+
+        'max_prompt_length' => (int) env('AI_PERSONAS_MAX_PROMPT_LENGTH', 8000),
+
+    ],
+
+    'context' => [
+        'max_messages' => (int) env('AI_CONTEXT_MAX_MESSAGES', 25),
+        'max_characters' => (int) env('AI_CONTEXT_MAX_CHARACTERS', 24000),
     ],
 
 ];

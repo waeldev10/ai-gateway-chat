@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AiPersona;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,7 +45,10 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function withDefaultSystemPrompt(array $messages): array
 {
-    // ..
+    return [
+        ['role' => 'system', 'content' => AiPersona::SYSTEM_DEFAULT_PROMPT],
+        ...$messages,
+    ];
 }

@@ -2,28 +2,36 @@
 
 namespace App\Providers;
 
+use App\Models\AiPersona;
+use App\Models\Conversation;
+use App\Policies\AiPersonaPolicy;
+use App\Policies\ConversationPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
+   
     public function register(): void
     {
-        //
+        
     }
 
-    /**
-     * Bootstrap any application services.
-     */
+  
     public function boot(): void
     {
+        $this->registerPolicies();
         $this->configureRateLimiting();
+    }
+
+    private function registerPolicies(): void
+    {
+        Gate::policy(Conversation::class, ConversationPolicy::class);
+        Gate::policy(AiPersona::class, AiPersonaPolicy::class);
     }
 
     private function configureRateLimiting(): void
@@ -47,6 +55,18 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(60)
                 ->by((string) ($user?->getAuthIdentifier() ?? $request->ip()));
+        });
+
+        RateLimiter::for('ai-stream', function (Request $request): Limit {
+            $key = $request->user()?->getKey() ?? $request->ip();
+
+            return Limit::perMinute(20)->by('ai-stream:'.$key);
+        });  
+        
+        RateLimiter::for('api-ai', function (Request $request): Limit {
+            $key = $request->user()?->getKey() ?? $request->ip();
+
+            return Limit::perMinute(20)->by('api-ai:'.$key);
         });
     }
 

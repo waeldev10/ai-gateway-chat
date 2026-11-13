@@ -7,9 +7,9 @@ use Illuminate\Database\Seeder;
 
 class AiDefaultPersonaSeeder extends Seeder
 {
-    public const DEFAULT_NAME = 'Default Assistant';
+    public const DEFAULT_NAME = AiPersona::SYSTEM_DEFAULT_NAME;
 
-    public const DEFAULT_PROMPT = 'You are a helpful AI assistant. Answer clearly and concisely, and match the user language.';
+    public const DEFAULT_PROMPT = AiPersona::SYSTEM_DEFAULT_PROMPT;
 
     public function run(): void
     {
