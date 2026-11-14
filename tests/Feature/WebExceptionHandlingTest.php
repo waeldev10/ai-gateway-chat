@@ -33,13 +33,13 @@ it('keeps web validation errors in the session instead of returning problem deta
         ->assertSessionHasErrors(['name']);
 
     expect(session('errors')->first('name'))
-        ->toBe('The name field is required.');
+        ->toBe('الاسم مطلوب.');
 });
 
 it('keeps web JSON validation errors in Laravel format', function () {
     $this->postJson('/testing/web-validation', ['name' => ''])
         ->assertUnprocessable()
-        ->assertJsonPath('message', 'The name field is required.')
+        ->assertJsonPath('message', 'الاسم مطلوب.')
         ->assertJsonValidationErrors(['name'])
         ->assertJsonMissingPath('type')
         ->assertJsonMissingPath('code');

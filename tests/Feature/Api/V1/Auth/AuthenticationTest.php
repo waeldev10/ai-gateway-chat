@@ -575,6 +575,6 @@ describe('api error handling', function () {
     });
 
     it('keeps web requests working', function () {
-        $this->get('/')->assertOk();
+        $this->get('/')->assertRedirect(route('login'));
     });
 });

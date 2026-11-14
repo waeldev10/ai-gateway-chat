@@ -34,6 +34,19 @@ class AiPersonaService
             ->get();
     }
 
+    /**
+     * @return Collection<int, AiPersona>
+     */
+    public function customFor(User $user): Collection
+    {
+        return AiPersona::query()
+            ->where('user_id', $user->getKey())
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'user_id', 'name', 'system_prompt', 'is_active', 'is_default']);
+    }
+
     public function systemDefault(): AiPersona
     {
         $cached = Cache::get(self::SYSTEM_DEFAULT_CACHE_KEY);

@@ -1,9 +1,354 @@
 @import 'tailwindcss';
+@custom-variant dark (&:is(.dark *));
+
+/* Alpine's x-cloak contract: elements stay hidden until Alpine initializes.
+   The desktop sidebar overrides this intentionally (see sidebar.blade.php)
+   so the rail never flashes hidden/visible while loading. */
+[x-cloak] {
+    display: none !important;
+}
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+@source "../**/*.blade.php";
+@source "../**/*.js";
 
+/* Tajawal is loaded by the Laravel Vite font plugin (`@fonts` in the layouts). */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Tajawal', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-heading: 'Tajawal', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Semantic UI tokens. `@theme inline` makes the Tailwind utilities reference
+   the `--ui-*` variables directly, so switching the `.dark` class updates the
+   whole interface without duplicating utility classes. Brand tokens are
+   overridden by the browser-local palette in `components/theme/ui-colors`. */
+@theme inline {
+    --color-background: var(--ui-background);
+    --color-foreground: var(--ui-foreground);
+    --color-surface: var(--ui-surface);
+    --color-surface-foreground: var(--ui-surface-foreground);
+    --color-muted: var(--ui-muted);
+    --color-muted-foreground: var(--ui-muted-foreground);
+    --color-border: var(--ui-border);
+    --color-input: var(--ui-input);
+    --color-ring: var(--ui-ring);
+    --color-primary: var(--ui-primary);
+    --color-primary-foreground: var(--ui-primary-foreground);
+    --color-accent: var(--ui-accent);
+    --color-accent-foreground: var(--ui-accent-foreground);
+    --color-link: var(--ui-link);
+    --color-destructive: var(--ui-destructive);
+    --color-destructive-foreground: var(--ui-destructive-foreground);
+    --color-success: var(--ui-success);
+    --color-success-foreground: var(--ui-success-foreground);
+    --color-warning: var(--ui-warning);
+    --color-warning-foreground: var(--ui-warning-foreground);
+    --color-info: var(--ui-info);
+    --color-info-foreground: var(--ui-info-foreground);
+}
+
+:root {
+    color-scheme: light;
+
+    --ui-background: #F8FAFC;
+    --ui-foreground: #0F172A;
+    --ui-surface: #FFFFFF;
+    --ui-surface-foreground: #0F172A;
+    --ui-muted: #F1F5F9;
+    --ui-muted-foreground: #475569;
+    --ui-border: #E2E8F0;
+    --ui-input: #CBD5E1;
+    --ui-ring: #6366F1;
+
+    --ui-primary: #4F46E5;
+    --ui-primary-foreground: #FFFFFF;
+    --ui-accent: #7C3AED;
+    --ui-accent-foreground: #FFFFFF;
+    --ui-link: #4338CA;
+
+    --ui-destructive: #DC2626;
+    --ui-destructive-foreground: #FFFFFF;
+    --ui-success: #047857;
+    --ui-success-foreground: #FFFFFF;
+    --ui-warning: #B45309;
+    --ui-warning-foreground: #FFFFFF;
+    --ui-info: #0369A1;
+    --ui-info-foreground: #FFFFFF;
+}
+
+.dark {
+    color-scheme: dark;
+
+    --ui-background: #0B1120;
+    --ui-foreground: #E2E8F0;
+    --ui-surface: #111827;
+    --ui-surface-foreground: #E2E8F0;
+    --ui-muted: #1F2937;
+    --ui-muted-foreground: #94A3B8;
+    --ui-border: #263244;
+    --ui-input: #334155;
+    --ui-ring: #818CF8;
+
+    --ui-primary: #818CF8;
+    --ui-primary-foreground: #0B1120;
+    --ui-accent: #A78BFA;
+    --ui-accent-foreground: #111827;
+    --ui-link: #A5B4FC;
+
+    --ui-destructive: #F87171;
+    --ui-destructive-foreground: #1F0A0A;
+    --ui-success: #34D399;
+    --ui-success-foreground: #052E1A;
+    --ui-warning: #FBBF24;
+    --ui-warning-foreground: #2A1A00;
+    --ui-info: #38BDF8;
+    --ui-info-foreground: #082F49;
+}
+
+/* Brand token roles. Defaults come from `config/ui.php` via
+   `components/theme/ui-colors.blade.php`; a browser-local
+   `localStorage.ui_colors` palette (strict #RRGGBB only, validated before
+   use) overrides the `--ui-*` variables on `<html>`. All other semantic
+   surfaces and text colors remain controlled by the light/dark token blocks
+   above, so a custom brand color cannot wash out the whole interface. */
+.ui-primary-btn {
+    background-color: var(--ui-primary);
+    color: var(--ui-primary-foreground);
+}
+.ui-primary-btn:hover {
+    opacity: 0.9;
+}
+.ui-primary-btn:focus-visible {
+    outline: 2px solid var(--ui-ring);
+    outline-offset: 2px;
+}
+.ui-primary-surface {
+    background-color: var(--ui-primary);
+    color: var(--ui-primary-foreground);
+}
+.ui-link {
+    color: var(--ui-link);
+}
+.ui-link:hover {
+    opacity: 0.8;
+}
+.ui-accent-soft {
+    background-color: color-mix(in srgb, var(--ui-accent) 8%, transparent);
+}
+.dark .ui-accent-soft {
+    background-color: color-mix(in srgb, var(--ui-accent) 14%, transparent);
+}
+
+/* Subtle scrollbars for containers that opt in (e.g. the sidebar list):
+   thin, rounded thumb on a transparent track, derived from the muted text
+   token so it stays neutral in both schemes. Layout/width/overflow behavior
+   is untouched — this only repaints the native scrollbar. */
+.ui-scroll-subtle {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ui-muted-foreground) 55%, transparent) transparent;
+}
+.ui-scroll-subtle::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.ui-scroll-subtle::-webkit-scrollbar-track {
+    background: transparent;
+}
+.ui-scroll-subtle::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--ui-muted-foreground) 45%, transparent);
+    border-radius: 9999px;
+}
+.ui-scroll-subtle::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--ui-muted-foreground) 75%, transparent);
+}
+
+/* Checkboxes follow the primary token via the native `accent-color`
+   mechanism: no extra state, no requests, no hardcoded fill color.
+   Checked fill + checkmark track `--ui-primary` live (Settings preview
+   updates the variable in place; a saved palette is re-applied from
+   localStorage on every load), while
+   unchecked borders/backgrounds keep their existing theme classes. The
+   browser picks the checkmark contrast automatically, and focus stays
+   visible in both schemes through the same token. */
+.ui-checkbox {
+    accent-color: var(--ui-primary);
+}
+.ui-checkbox:focus-visible {
+    outline: 2px solid var(--ui-ring);
+    outline-offset: 2px;
+}
+
+/* ChatGPT-style pre-first-token indicator: three dots that pulse in
+   sequence while the assistant response is being prepared. Rendered in
+   the muted text token so it stays neutral in both schemes, and symmetric
+   so RTL needs no special casing. The dots exist only until the first real
+   streamed chunk arrives. */
+.typing-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 2px;
+    color: var(--ui-muted-foreground);
+}
+.typing-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 9999px;
+    background-color: currentColor;
+    animation: typing-blink 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+.typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+@keyframes typing-blink {
+    0%, 60%, 100% {
+        opacity: 0.25;
+        transform: translateY(0);
+    }
+    30% {
+        opacity: 1;
+        transform: translateY(-3px);
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .typing-dot {
+        animation: none;
+        opacity: 0.7;
+    }
+}
+
+/* Navigation loading gate (see app.js): while the gate class is present
+   (the first ~250ms of a navigation) the framework-owned progress bar
+   stays hidden. Fast navigations finish before it lifts and never flash
+   it; slow navigations reveal the bar until they complete. Visibility
+   only — navigation timing and the bar itself are untouched. */
+html.nav-loading-pending #nprogress {
+    display: none !important;
+}
+
+/* Assistant markdown body (server-rendered from SafeMarkdown only).
+   Assistant bubbles keep their existing layout/typography; this only gives
+   structural Markdown elements (headings, lists, tables, code, quotes,
+   links) a readable rendering inside the same bubble. User messages stay
+   plain escaped text. All AI HTML is sanitized server-side first. */
+.ai-markdown {
+    overflow-wrap: anywhere;
+}
+.ai-markdown > *:first-child {
+    margin-top: 0;
+}
+.ai-markdown > *:last-child {
+    margin-bottom: 0;
+}
+.ai-markdown p {
+    margin-block: 0.5em;
+}
+.ai-markdown p:first-child {
+    margin-top: 0;
+}
+.ai-markdown p:last-child {
+    margin-bottom: 0;
+}
+.ai-markdown h1,
+.ai-markdown h2,
+.ai-markdown h3,
+.ai-markdown h4 {
+    font-weight: 700;
+    line-height: 1.6;
+    margin-block: 0.75em 0.375em;
+}
+.ai-markdown h1 { font-size: 1.125rem; }
+.ai-markdown h2 { font-size: 1.0625rem; }
+.ai-markdown h3 { font-size: 1rem; }
+.ai-markdown h4 { font-size: 0.9375rem; }
+.ai-markdown ul,
+.ai-markdown ol {
+    margin-block: 0.5em;
+    padding-inline-start: 1.5em;
+}
+.ai-markdown ul { list-style-type: disc; }
+.ai-markdown ol { list-style-type: decimal; }
+.ai-markdown li { margin-block: 0.25em; }
+.ai-markdown li > ul,
+.ai-markdown li > ol {
+    margin-block: 0.25em;
+}
+.ai-markdown table {
+    display: block;
+    max-width: 100%;
+    width: max-content;
+    overflow-x: auto;
+    margin-block: 0.75em;
+    font-size: 0.8125rem;
+    border-collapse: collapse;
+}
+.ai-markdown th,
+.ai-markdown td {
+    border: 1px solid var(--ui-border);
+    padding: 0.375em 0.625em;
+    text-align: start;
+    white-space: normal;
+}
+.ai-markdown th {
+    font-weight: 700;
+    background-color: var(--ui-muted);
+}
+.ai-markdown pre {
+    direction: ltr;
+    text-align: left;
+    margin-block: 0.75em;
+    padding: 0.75em 1em;
+    border-radius: 0.75rem;
+    overflow-x: auto;
+    font-size: 0.8125rem;
+    line-height: 1.7;
+    background-color: var(--ui-muted);
+}
+.ai-markdown pre code {
+    background: none;
+    padding: 0;
+    font-size: inherit;
+}
+.ai-markdown code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8125rem;
+    background-color: color-mix(in srgb, var(--ui-foreground) 6%, transparent);
+    border-radius: 0.375rem;
+    padding: 0.125em 0.375em;
+}
+.dark .ai-markdown code {
+    background-color: color-mix(in srgb, var(--ui-foreground) 9%, transparent);
+}
+.ai-markdown blockquote {
+    margin-block: 0.5em;
+    padding-inline-start: 0.75em;
+    border-inline-start: 2px solid var(--ui-primary);
+    color: var(--ui-muted-foreground);
+}
+.ai-markdown a {
+    color: var(--ui-link);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.ai-markdown hr {
+    margin-block: 0.75em;
+    border: none;
+    border-top: 1px solid var(--ui-border);
+}
+
+/* User-only message accent: a 2px inline-start bar in the primary token
+   color. Applied EXPLICITLY by role — user bubbles (server Blade branch
+   for MessageRole::User and the optimistic buildUserNode) carry
+   .chat-user-accent; the assistant branch and buildAssistantNode never do,
+   and no shared wrapper above either branch defines a side border, so the
+   assistant cannot inherit one. border-inline-start is direction-aware, so
+   the bar sits on the correct side in both RTL and LTR. Never select this
+   by :first-child/:last-child or message position. */
+.chat-user-accent {
+    border-inline-start: 2px solid var(--ui-primary);
 }

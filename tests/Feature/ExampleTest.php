@@ -1,7 +1,14 @@
 <?php
 
-it('returns a successful response', function () {
-    $response = $this->get('/');
+use App\Models\User;
 
-    $response->assertStatus(200);
+it('redirects guests from the root to the login page', function () {
+    $this->get('/')
+        ->assertRedirect(route('login'));
+});
+
+it('redirects authenticated users from the root to a new conversation', function () {
+    $this->actingAs(User::factory()->make())
+        ->get('/')
+        ->assertRedirect(route('conversations.create'));
 });
