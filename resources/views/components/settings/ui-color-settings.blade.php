@@ -6,10 +6,10 @@
         ? strtoupper(trim($v))
         : null;
     $initial = [
-        'primary' => $uiHex(config('ui.colors.defaults.light.primary')) ?? '#4F46E5',
+        'primary' => $uiHex(config('ui.colors.defaults.light.primary')) ?? '#0C5548',
         'primary_text' => $uiHex(config('ui.colors.defaults.light.primary_text')) ?? '#FFFFFF',
-        'accent' => $uiHex(config('ui.colors.defaults.light.accent')) ?? '#7C3AED',
-        'link' => $uiHex(config('ui.colors.defaults.light.link')) ?? '#4338CA',
+        'accent' => $uiHex(config('ui.colors.defaults.light.accent')) ?? '#23796A',
+        'link' => $uiHex(config('ui.colors.defaults.light.link')) ?? '#0C5548',
     ];
 @endphp
 
@@ -90,7 +90,7 @@
         <div x-show="open" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition-opacity duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
             class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="revert(); open = false;" aria-hidden="true"></div>
         <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95 translate-y-2" x-transition:enter-end="opacity-100 scale-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100 translate-y-0" x-transition:leave-end="opacity-0 scale-95 translate-y-2"
-            class="relative bg-surface text-foreground rounded-2xl p-5 sm:p-6 w-full max-w-md shadow-2xl border border-border max-h-[90vh] overflow-y-auto">
+            class="relative bg-surface text-foreground rounded-2xl p-5 sm:p-6 w-full max-w-md border border-border max-h-[90vh] overflow-y-auto">
             <div class="flex items-start gap-3">
                 <span class="w-10 h-10 shrink-0 rounded-full bg-muted text-muted-foreground grid place-items-center" aria-hidden="true">
                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" /></svg>

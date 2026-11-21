@@ -8,6 +8,7 @@ use App\Enums\MessageStatus;
 use App\Models\AiPersona;
 use App\Models\Conversation;
 use App\Models\Message;
+use Generator;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -27,25 +28,72 @@ class MessageRegenerationService
         ?AiPersona $persona = null,
     ): Message {
         return $this->operationLock->run($conversation, function () use ($conversation, $message, $source, $persona): Message {
-            [$history, $replace] = DB::transaction(function () use ($conversation, $message): array {
-                $lockedConversation = $this->operationLock->lockForUpdate($conversation);
-
-                $target = $lockedConversation->messages()
-                    ->whereKey($message->getKey())
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                return $this->generationPlan($lockedConversation, $target);
-            });
-
-            if ($history === [] || ! $this->containsUserMessage($history)) {
-                throw ValidationException::withMessages([
-                    'message' => 'لا توجد رسائل مكتملة كافية لإعادة توليد الرد.',
-                ]);
-            }
+            [$history, $replace] = $this->resolvePlan($conversation, $message);
 
             return $this->generationService->generate($conversation, $history, $source, $replace, $persona);
         });
+    }
+
+    /**
+     * Stream a regenerated assistant reply while holding the conversation lock.
+     *
+     * @return Generator<int, string, mixed, array{assistant_message: ?Message, failed: bool}>
+     */
+    public function stream(
+        Conversation $conversation,
+        Message $message,
+        AiSource $source = AiSource::Web,
+        ?AiPersona $persona = null,
+        bool $branch = false,
+    ): Generator {
+        return $this->operationLock->runGenerator(
+            $conversation,
+            function () use ($conversation, $message, $source, $persona, $branch): Generator {
+                [$history, $replace] = $this->resolvePlan($conversation, $message);
+
+                $beforePersist = $branch
+                    ? function () use ($conversation, $replace): void {
+                        if ($replace !== null) {
+                            $this->contextService->deleteAfter($conversation, $replace);
+                        }
+                    }
+                : null;
+
+                return yield from $this->generationService->stream(
+                    $conversation,
+                    $history,
+                    $source,
+                    $persona,
+                    $replace,
+                    $beforePersist,
+                );
+            },
+        );
+    }
+
+    /**
+     * @return array{0: array<int, array{role: string, content: string}>, 1: ?Message}
+     */
+    private function resolvePlan(Conversation $conversation, Message $message): array
+    {
+        [$history, $replace] = DB::transaction(function () use ($conversation, $message): array {
+            $lockedConversation = $this->operationLock->lockForUpdate($conversation);
+
+            $target = $lockedConversation->messages()
+                ->whereKey($message->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            return $this->generationPlan($lockedConversation, $target);
+        });
+
+        if ($history === [] || ! $this->containsUserMessage($history)) {
+            throw ValidationException::withMessages([
+                'message' => 'لا توجد رسائل مكتملة كافية لإعادة توليد الرد.',
+            ]);
+        }
+
+        return [$history, $replace];
     }
 
     private function generationPlan(Conversation $conversation, Message $message): array

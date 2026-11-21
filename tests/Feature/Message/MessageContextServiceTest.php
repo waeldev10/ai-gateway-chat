@@ -180,3 +180,39 @@ it('appends the current user message within context limits', function () {
     expect(array_column($history, 'content'))
         ->toBe(['middle', 'latest', 'current']);
 });
+
+it('deletes only messages after the target using timestamp and id ordering', function () {
+    $conversation = Conversation::factory()->create();
+    $otherConversation = Conversation::factory()->create();
+    $sameTime = now()->subMinute();
+
+    $before = Message::factory()->for($conversation)->create([
+        'content' => 'before',
+        'created_at' => $sameTime->copy()->subMinute(),
+    ]);
+    $target = Message::factory()->for($conversation)->create([
+        'content' => 'target',
+        'created_at' => $sameTime,
+    ]);
+    $sameTimestamp = Message::factory()->for($conversation)->create([
+        'content' => 'same timestamp',
+        'created_at' => $sameTime,
+    ]);
+    $later = Message::factory()->for($conversation)->create([
+        'content' => 'later',
+        'created_at' => $sameTime->copy()->addMinute(),
+    ]);
+    $other = Message::factory()->for($otherConversation)->create([
+        'content' => 'other conversation',
+        'created_at' => $sameTime->copy()->addMinute(),
+    ]);
+
+    $deleted = app(MessageContextService::class)->deleteAfter($conversation, $target);
+
+    expect($deleted)->toBe(2)
+        ->and($before->fresh())->not->toBeNull()
+        ->and($target->fresh())->not->toBeNull()
+        ->and($sameTimestamp->fresh())->toBeNull()
+        ->and($later->fresh())->toBeNull()
+        ->and($other->fresh())->not->toBeNull();
+});

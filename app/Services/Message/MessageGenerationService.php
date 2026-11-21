@@ -4,6 +4,7 @@ namespace App\Services\Message;
 
 use App\AI\AiService;
 use App\AI\DTOs\AiRequest;
+use App\AI\DTOs\AiResponse;
 use App\Enums\AiRequestStatus;
 use App\Enums\AiSource;
 use App\Enums\MessageRole;
@@ -15,6 +16,8 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Services\Persona\AiPromptService;
 use Closure;
+use Generator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -142,6 +145,95 @@ class MessageGenerationService
         );
     }
 
+    /**
+     * Stream a generated assistant reply while recording the AI request.
+     *
+     * Failures are reported through the returned array instead of being thrown
+     * once streaming has started, because response headers may already be sent.
+     *
+     * @return Generator<int, string, mixed, array{assistant_message: ?Message, failed: bool}>
+     */
+    public function stream(
+        Conversation $conversation,
+        array $messages,
+        AiSource $source = AiSource::Web,
+        ?AiPersona $persona = null,
+        ?Message $replace = null,
+        ?Closure $beforePersist = null,
+    ): Generator {
+        [$provider, $model] = $this->configuredConnection();
+
+        $aiRequest = AiRequestRecord::query()->create([
+            'user_id' => $conversation->user_id,
+            'conversation_id' => $conversation->id,
+            'provider' => $provider,
+            'model' => $model,
+            'status' => AiRequestStatus::Started,
+            'source' => $source,
+        ]);
+
+        $startedAt = microtime(true);
+        $content = '';
+        $finishReason = null;
+        $usage = null;
+
+        try {
+            $request = AiRequest::fromMessages(
+                $this->promptService->withSystemPrompt($conversation, $messages, $persona),
+            );
+
+            foreach ($this->aiService->stream($request) as $chunk) {
+                if ($this->isStopped($conversation)) {
+                    $this->clearStop($conversation);
+                    break;
+                }
+
+                if ($chunk->usage !== null) {
+                    $usage = $chunk->usage;
+                }
+
+                if ($chunk->finishReason !== null) {
+                    $finishReason = $chunk->finishReason;
+                }
+
+                if ($chunk->content === '') {
+                    continue;
+                }
+
+                $content .= $chunk->content;
+
+                yield $chunk->content;
+            }
+
+            if (trim($content) === '') {
+                throw AiException::invalidResponse($provider);
+            }
+
+            $message = $this->persist(
+                [
+                    'ai_request' => $aiRequest,
+                    'response' => new AiResponse($content, $provider, $model, $finishReason, $usage),
+                    'started_at' => $startedAt,
+                ],
+                $conversation,
+                $replace,
+                $beforePersist,
+            );
+
+            return ['assistant_message' => $message, 'failed' => false];
+        } catch (Throwable $exception) {
+            $message = $content === ''
+                ? null
+                : $this->persistFailedMessage($aiRequest, $conversation, $content, $startedAt, $exception, $replace, $beforePersist);
+
+            if ($message === null) {
+                $this->markAiRequestAsFailed($aiRequest, $startedAt, $exception);
+            }
+
+            return ['assistant_message' => $message, 'failed' => true];
+        }
+    }
+
     private function configuredConnection(): array
     {
         $connection = config('ai.default');
@@ -153,6 +245,66 @@ class MessageGenerationService
             : 'unknown';
 
         return [$provider, $model];
+    }
+
+    private function persistFailedMessage(
+        AiRequestRecord $aiRequest,
+        Conversation $conversation,
+        string $content,
+        float $startedAt,
+        Throwable $exception,
+        ?Message $replace = null,
+        ?Closure $beforePersist = null,
+    ): ?Message {
+        try {
+            $message = DB::transaction(function () use ($conversation, $content, $replace, $beforePersist): Message {
+                $lockedConversation = Conversation::query()
+                    ->whereKey($conversation->getKey())
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($replace !== null) {
+                    $message = $lockedConversation->messages()
+                        ->whereKey($replace->getKey())
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                }
+
+                if ($beforePersist !== null) {
+                    $beforePersist();
+                }
+
+                if ($replace !== null) {
+                    $message->update([
+                        'content' => $content,
+                        'status' => MessageStatus::Failed,
+                    ]);
+
+                    return $message;
+                }
+
+                return $lockedConversation->messages()->create([
+                    'role' => MessageRole::Assistant,
+                    'content' => $content,
+                    'status' => MessageStatus::Failed,
+                ]);
+            });
+        } catch (Throwable $persistenceException) {
+            report($persistenceException);
+
+            return null;
+        }
+
+        rescue(function () use ($aiRequest, $message, $startedAt, $exception): void {
+            $aiRequest->update([
+                'message_id' => $message->id,
+                'status' => AiRequestStatus::Failed,
+                'duration_ms' => $this->durationMs($startedAt),
+                'error_message' => $exception->getMessage(),
+            ]);
+        }, report: false);
+
+        return $message;
     }
 
     private function markAiRequestAsFailed(AiRequestRecord $aiRequest, float $startedAt, Throwable $exception): void
@@ -169,5 +321,20 @@ class MessageGenerationService
     private function durationMs(float $startedAt): int
     {
         return max(0, (int) round((microtime(true) - $startedAt) * 1000));
+    }
+
+    private function isStopped(Conversation $conversation): bool
+    {
+        return (bool) Cache::get('message-stop:'.$conversation->getKey());
+    }
+
+    private function clearStop(Conversation $conversation): void
+    {
+        Cache::forget('message-stop:'.$conversation->getKey());
+    }
+
+    public function stop(Conversation $conversation): void
+    {
+        Cache::put('message-stop:'.$conversation->getKey(), true, now()->addMinutes(5));
     }
 }

@@ -4,14 +4,13 @@ namespace App\Services\Conversation;
 
 use App\Models\Conversation;
 use App\Models\User;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
 use App\Services\Message\ConversationOperationLock;
+use Illuminate\Support\Facades\DB;
 
 class ConversationService
 {
     public function __construct(
-        private readonly ConversationOperationLock $operationLock = new ConversationOperationLock()
+        private readonly ConversationOperationLock $operationLock = new ConversationOperationLock
     ) {}
 
     public function create(User $user, array $data): Conversation
@@ -24,6 +23,11 @@ class ConversationService
     public function show(Conversation $conversation): Conversation
     {
         return $conversation;
+    }
+
+    public function findFor(User $user, string $id): Conversation
+    {
+        return $user->conversations()->findOrFail($id);
     }
 
     public function rename(Conversation $conversation, string $title): Conversation
@@ -58,5 +62,12 @@ class ConversationService
         }
 
         return $conversation;
+    }
+
+    public function togglePin(Conversation $conversation): Conversation
+    {
+        return $conversation->pinned_at === null
+            ? $this->pin($conversation)
+            : $this->unpin($conversation);
     }
 }

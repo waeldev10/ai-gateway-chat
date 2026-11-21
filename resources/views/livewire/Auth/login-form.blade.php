@@ -17,8 +17,8 @@
             <x-ui.input-error for="password" />
         </div>
         <div class="flex items-center gap-2">
-            <input id="remember" type="checkbox" wire:model="remember" class="h-4 w-4 rounded border-black/20 dark:border-white/20 bg-transparent ui-checkbox">
-            <label for="remember" class="text-sm text-zinc-600 dark:text-zinc-300">تذكرني</label>
+            <input id="remember" type="checkbox" wire:model="remember" class="h-4 w-4 rounded border-input bg-transparent ui-checkbox">
+            <label for="remember" class="text-sm text-muted-foreground">تذكرني</label>
         </div>
         <x-ui.button type="submit" wire:loading.attr="disabled" wire:target="login" class="w-full inline-flex items-center justify-center gap-1.5">
             <span wire:loading wire:target="login">

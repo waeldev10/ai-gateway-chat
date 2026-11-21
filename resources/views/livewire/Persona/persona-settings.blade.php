@@ -2,43 +2,43 @@
      The user's own personas can be created up to the configured limit and
      each one toggles independently. Every mutation is a single Livewire
      action with unified toasts and two-step delete. --}}
-<div class="space-y-4">
+<div class="space-y-5">
     @if($this->systemDefault !== null)
-        <div class="rounded-2xl border border-border bg-surface p-5 sm:p-6">
+        <div class="rounded-3xl border border-border/80 bg-surface/90 p-5 sm:p-6">
             <div class="flex items-center gap-2 flex-wrap">
                 <h2 class="text-sm font-semibold">الشخصية الافتراضية</h2>
                 <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium bg-muted text-muted-foreground">النظام</span>
                 <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium bg-success/15 text-success">نشطة دائمًا</span>
             </div>
             <p class="mt-1 text-xs text-muted-foreground leading-relaxed">تُستخدم هذه الشخصية عند عدم وجود شخصية مخصصة نشطة، ولا يمكن تعديلها أو حذفها.</p>
-            <div class="mt-3 rounded-xl bg-muted px-3.5 py-3">
+            <div class="mt-4 rounded-2xl border border-border/70 bg-muted/70 px-4 py-3.5">
                 <p class="text-xs font-medium">{{ $this->systemDefault->name }}</p>
                 <p class="mt-1 text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap break-words" dir="auto">{{ $this->systemDefault->system_prompt }}</p>
             </div>
         </div>
     @endif
 
-    <div class="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-        <h2 class="text-sm font-semibold">الشخصيات المخصصة</h2>
+    <div class="rounded-3xl border border-border/80 bg-surface/90 p-5 sm:p-6">
+        <h2 class="text-base font-semibold tracking-tight">الشخصيات المخصصة</h2>
         <p class="mt-1 text-xs text-muted-foreground leading-relaxed">يمكنك تفعيل أكثر من شخصية مخصصة في الوقت نفسه، وسيتم استخدام أحدث شخصية نشطة عند بدء محادثة جديدة.</p>
 
         @if($this->personas->isEmpty())
             <p class="mt-4 text-xs text-muted-foreground leading-relaxed">لا توجد شخصيات مخصصة بعد. أضف شخصيتك الأولى من النموذج أدناه.</p>
         @else
-            <ul class="mt-4 space-y-3">
+            <ul class="mt-5 space-y-3">
                 @foreach($this->personas as $persona)
-                    <li wire:key="persona-{{ $persona->id }}" class="rounded-xl border border-border px-3.5 py-3" data-persona-id="{{ $persona->id }}">
+                    <li wire:key="persona-{{ $persona->id }}" class="rounded-2xl border border-border/80 bg-background/50 px-4 py-3.5" data-persona-id="{{ $persona->id }}">
                         <div class="flex items-center gap-2 flex-wrap">
                             <span class="flex-1 min-w-0 text-xs font-semibold truncate">{{ $persona->name }}</span>
                             @if($persona->is_active)
-                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium bg-success/15 text-success">مفعّلة</span>
+                                <span class="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">مفعّلة</span>
                             @else
                                 <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium bg-muted text-muted-foreground">معطّلة</span>
                             @endif
                         </div>
 
                         @if($editingId === (string) $persona->id)
-                            <form wire:submit="update" class="mt-3 space-y-3">
+                            <form wire:submit="update" class="mt-4 space-y-4 rounded-2xl border border-border/70 bg-surface p-4 sm:p-5">
                                 <div>
                                     <x-ui.label for="persona-edit-name-{{ $persona->id }}">الاسم</x-ui.label>
                                     <x-ui.input id="persona-edit-name-{{ $persona->id }}" type="text" wire:model="editingName" :error="$errors->has('editingName')" maxlength="{{ $this->maxNameLength }}" />
@@ -91,11 +91,11 @@
         @endif
     </div>
 
-    <div class="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-        <h2 class="text-sm font-semibold">إضافة شخصية</h2>
+    <div class="rounded-3xl border border-border/80 bg-surface/90 p-5 sm:p-6">
+        <h2 class="text-base font-semibold tracking-tight">إضافة شخصية</h2>
         @if($this->canCreate)
             <p class="mt-1 text-xs text-muted-foreground leading-relaxed">مثال: مُراجع شيفرة يركز على الأمان والوضوح. يمكنك إنشاء {{ $this->maxCustom }} شخصيات مخصصة كحد أقصى.</p>
-            <form wire:submit="create" class="mt-4 space-y-4">
+            <form wire:submit="create" class="mt-4 space-y-4 rounded-2xl border border-border/70 bg-background/50 p-4 sm:p-5">
                 <div>
                     <x-ui.label for="persona-name">الاسم</x-ui.label>
                     <x-ui.input id="persona-name" type="text" wire:model="name" :error="$errors->has('name')" maxlength="{{ $this->maxNameLength }}" placeholder="اسم الشخصية" />

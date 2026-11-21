@@ -2,11 +2,11 @@
      Tab switching is Alpine-only so it never costs a server request.
      Both saves are single Livewire actions with unified toasts. --}}
 <div x-data="{ tab: 'profile' }">
-    <div class="rounded-2xl border border-border bg-surface p-5 sm:p-6">
+    <div class="rounded-3xl border border-border/80 bg-surface/90 p-5 sm:p-7">
         <div class="flex items-center gap-3.5">
-            <span class="w-14 h-14 rounded-full ui-primary-surface grid place-items-center text-xl font-semibold shrink-0" aria-hidden="true">{{ mb_substr($name !== '' ? $name : 'م', 0, 1) }}</span>
+            <span class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl ui-accent-soft text-xl font-semibold text-primary" aria-hidden="true">{{ mb_substr($name !== '' ? $name : 'م', 0, 1) }}</span>
             <span class="flex-1 min-w-0">
-                <span class="block text-base font-semibold truncate">{{ $name }}</span>
+                <span class="block truncate text-lg font-semibold tracking-tight">{{ $name }}</span>
                 <span class="block text-xs text-muted-foreground truncate mt-0.5" dir="ltr">{{ $email }}</span>
             </span>
         </div>
@@ -15,10 +15,10 @@
 
         <div class="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1" role="tablist" aria-label="أقسام الملف الشخصي">
             <button type="button" role="tab" :aria-selected="tab === 'profile' ? 'true' : 'false'" @click="tab = 'profile'"
-                :class="tab === 'profile' ? 'bg-surface text-foreground shadow' : 'text-muted-foreground hover:bg-surface/60'"
+                :class="tab === 'profile' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-surface/60 hover:text-foreground'"
                 class="rounded-lg px-2 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">بيانات الحساب</button>
             <button type="button" role="tab" :aria-selected="tab === 'password' ? 'true' : 'false'" @click="tab = 'password'"
-                :class="tab === 'password' ? 'bg-surface text-foreground shadow' : 'text-muted-foreground hover:bg-surface/60'"
+                :class="tab === 'password' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-surface/60 hover:text-foreground'"
                 class="rounded-lg px-2 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">كلمة المرور</button>
         </div>
 

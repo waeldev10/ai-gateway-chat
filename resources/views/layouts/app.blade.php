@@ -77,8 +77,8 @@
 
         <x-ui.toast />
 
-        <div class="flex-1 flex flex-col min-w-0 min-h-0 bg-surface overflow-hidden">
-            <header class="h-14 flex items-center gap-3 px-4 border-b border-border shrink-0">
+        <div class="flex-1 flex flex-col min-w-0 min-h-0 bg-background overflow-hidden">
+            <header class="app-main-header relative z-10 h-14 flex items-center gap-3 px-4 shrink-0">
                 <button type="button" @click="drawer = true; userMenu = false"
                     aria-label="فتح القائمة" aria-controls="chat-sidebar" :aria-expanded="drawer ? 'true' : 'false'"
                     class="lg:hidden w-9 h-9 -ms-1 grid place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
@@ -103,7 +103,10 @@
                     </button>
                 </div>
             </header>
-            <main class="flex-1 min-h-0 overflow-y-auto flex flex-col bg-background">
+            <main @class([
+                'flex-1 min-h-0 overflow-y-auto flex flex-col bg-background pt-4',
+                'preference-page-ambient' => request()->routeIs('personas.index', 'profile.show', 'conversations.search'),
+            ])>
                 @yield('content')
             </main>
         </div>

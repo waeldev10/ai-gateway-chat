@@ -129,7 +129,7 @@ describe('sending messages', function () {
             ->assertJsonPath('data.assistant_message.content', 'Second answer');
     });
 
-    it('titles an untitled conversation from the first user message', function () {
+    it('does not auto-title an untitled conversation via the API', function () {
         $user = User::factory()->create();
         $conversation = Conversation::factory()->for($user)->create(['title' => null]);
 
@@ -145,7 +145,7 @@ describe('sending messages', function () {
             ])
             ->assertCreated();
 
-        expect($conversation->refresh()->title)->toBe('Plan my trip to Japan');
+        expect($conversation->refresh()->title)->toBeNull();
     });
 
     it('keeps the user message when the ai provider fails', function () {

@@ -78,7 +78,7 @@
             x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-2 scale-95" x-transition:enter-end="opacity-100 translate-y-0 scale-100"
             x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0 scale-100" x-transition:leave-end="opacity-0 -translate-y-2 scale-95"
             :role="t.type === 'error' ? 'alert' : 'status'"
-            class="pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-2xl border border-border bg-surface p-3 text-foreground shadow-2xl">
+            class="pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-2xl border border-border bg-surface p-3 text-foreground">
             <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full"
                 :class="t.type === 'success' ? 'bg-success/15 text-success' : (t.type === 'error' ? 'bg-destructive/15 text-destructive' : (t.type === 'warning' ? 'bg-warning/15 text-warning' : 'bg-info/15 text-info'))"
                 aria-hidden="true">

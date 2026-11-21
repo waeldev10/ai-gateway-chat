@@ -5,29 +5,16 @@ namespace App\Services\Message;
 use App\Exceptions\ConversationBusyException;
 use App\Models\Conversation;
 use Closure;
+use Generator;
 use Illuminate\Support\Facades\Cache;
 
 final class ConversationOperationLock
 {
-    /**
-     * Run a conversation mutation while holding its operation lock.
-     *
-     * @param  Closure(): mixed  $callback
-     */
     public function run(Conversation $conversation, Closure $callback): mixed
     {
         return $this->runMany([$conversation], $callback);
     }
 
-    /**
-     * Run a mutation while holding the operation lock of every conversation.
-     *
-     * Locks are acquired in a stable order so overlapping bulk operations
-     * cannot leave locks behind when one of them is already busy.
-     *
-     * @param  array<int, Conversation>  $conversations
-     * @param  Closure(): mixed  $callback
-     */
     public function runMany(array $conversations, Closure $callback): mixed
     {
         $locks = [];
@@ -52,8 +39,28 @@ final class ConversationOperationLock
     }
 
     /**
-     * Refresh and lock the conversation row inside the current transaction.
+     * Hold the conversation lock for as long as the returned generator is
+     * being consumed. The lock is acquired on first iteration and released
+     * when the generator finishes or is destroyed.
+     *
+     * @param  Closure(): Generator<mixed, mixed, mixed, mixed>  $callback
+     * @return Generator<mixed, mixed, mixed, mixed>
      */
+    public function runGenerator(Conversation $conversation, Closure $callback): Generator
+    {
+        $lock = Cache::lock(self::key($conversation), $this->ttlSeconds());
+
+        if (! $lock->get()) {
+            throw ConversationBusyException::operationInProgress();
+        }
+
+        try {
+            return yield from $callback();
+        } finally {
+            rescue(fn () => $lock->release(), report: false);
+        }
+    }
+
     public function lockForUpdate(Conversation $conversation): Conversation
     {
         $locked = Conversation::query()
@@ -71,10 +78,6 @@ final class ConversationOperationLock
         return 'message-operation:'.$conversation->getKey();
     }
 
-    /**
-     * @param  array<int, Conversation>  $conversations
-     * @return array<int, string>
-     */
     private function uniqueKeys(array $conversations): array
     {
         $keys = [];

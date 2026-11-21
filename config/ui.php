@@ -7,16 +7,16 @@ return [
 
         'defaults' => [
             'light' => [
-                'primary' => '#4F46E5',
+                'primary' => '#0C5548',
                 'primary_text' => '#FFFFFF',
-                'accent' => '#7C3AED',
-                'link' => '#4338CA',
+                'accent' => '#23796A',
+                'link' => '#0C5548',
             ],
             'dark' => [
-                'primary' => '#818CF8',
-                'primary_text' => '#0B1120',
-                'accent' => '#A78BFA',
-                'link' => '#A5B4FC',
+                'primary' => '#63B4A5',
+                'primary_text' => '#06231D',
+                'accent' => '#80C8BA',
+                'link' => '#8FDCCC',
             ],
         ],
     ],

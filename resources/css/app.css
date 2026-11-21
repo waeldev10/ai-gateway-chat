@@ -13,17 +13,34 @@
 @source "../**/*.blade.php";
 @source "../**/*.js";
 
-/* Tajawal is loaded by the Laravel Vite font plugin (`@fonts` in the layouts). */
-@theme {
-    --font-sans: 'Tajawal', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
-    --font-heading: 'Tajawal', ui-sans-serif, system-ui, sans-serif;
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("../../public/assets/fonts/thmanyahsans-regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
 }
 
-/* Semantic UI tokens. `@theme inline` makes the Tailwind utilities reference
-   the `--ui-*` variables directly, so switching the `.dark` class updates the
-   whole interface without duplicating utility classes. Brand tokens are
-   overridden by the browser-local palette in `components/theme/ui-colors`. */
+@font-face {
+  font-family: "Noto Sans Arabic";
+  src: url("../../public/assets/fonts/noto-sans-arabic.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/* Tajawal is loaded by the Laravel Vite font plugin (`@fonts` in the layouts). */
+@theme {
+    /* --font-sans: 'Tajawal', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-heading: 'Tajawal', ui-sans-serif, system-ui, sans-serif;
+    --font-sans:'' */
+    --font-sans: "Thmanyah Sans", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-heading: "Thmanyah Sans", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+}
+
+
+
 @theme inline {
     --color-background: var(--ui-background);
     --color-foreground: var(--ui-foreground);
@@ -60,13 +77,13 @@
     --ui-muted-foreground: #475569;
     --ui-border: #E2E8F0;
     --ui-input: #CBD5E1;
-    --ui-ring: #6366F1;
+    --ui-ring: #3B8C7D;
 
-    --ui-primary: #4F46E5;
+    --ui-primary: #0C5548;
     --ui-primary-foreground: #FFFFFF;
-    --ui-accent: #7C3AED;
+    --ui-accent: #23796A;
     --ui-accent-foreground: #FFFFFF;
-    --ui-link: #4338CA;
+    --ui-link: #0C5548;
 
     --ui-destructive: #DC2626;
     --ui-destructive-foreground: #FFFFFF;
@@ -89,13 +106,13 @@
     --ui-muted-foreground: #94A3B8;
     --ui-border: #263244;
     --ui-input: #334155;
-    --ui-ring: #818CF8;
+    --ui-ring: #63B4A5;
 
-    --ui-primary: #818CF8;
-    --ui-primary-foreground: #0B1120;
-    --ui-accent: #A78BFA;
-    --ui-accent-foreground: #111827;
-    --ui-link: #A5B4FC;
+    --ui-primary: #63B4A5;
+    --ui-primary-foreground: #06231D;
+    --ui-accent: #80C8BA;
+    --ui-accent-foreground: #06231D;
+    --ui-link: #8FDCCC;
 
     --ui-destructive: #F87171;
     --ui-destructive-foreground: #1F0A0A;
@@ -107,12 +124,6 @@
     --ui-info-foreground: #082F49;
 }
 
-/* Brand token roles. Defaults come from `config/ui.php` via
-   `components/theme/ui-colors.blade.php`; a browser-local
-   `localStorage.ui_colors` palette (strict #RRGGBB only, validated before
-   use) overrides the `--ui-*` variables on `<html>`. All other semantic
-   surfaces and text colors remain controlled by the light/dark token blocks
-   above, so a custom brand color cannot wash out the whole interface. */
 .ui-primary-btn {
     background-color: var(--ui-primary);
     color: var(--ui-primary-foreground);
@@ -124,6 +135,83 @@
     outline: 2px solid var(--ui-ring);
     outline-offset: 2px;
 }
+
+button:not(:disabled) {
+    cursor: pointer;
+}
+
+.sidebar-ambient {
+    background-color: var(--ui-background);
+    background-image: linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--ui-primary) 7%, var(--ui-background)),
+        color-mix(in srgb, var(--ui-primary) 2%, var(--ui-background)) 48%,
+        var(--ui-background) 100%
+    );
+}
+
+.dark .sidebar-ambient {
+    background-image: linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--ui-primary) 10%, var(--ui-background)),
+        color-mix(in srgb, var(--ui-primary) 3%, var(--ui-background)) 48%,
+        var(--ui-background) 100%
+    );
+}
+
+.app-main-header {
+    background-color: var(--ui-background);
+}
+
+.app-main-header::after {
+    position: absolute;
+    z-index: 1;
+    inset-inline: 0;
+    top: 100%;
+    height: 2.5rem;
+    background: linear-gradient(
+        to bottom,
+        var(--ui-background),
+        color-mix(in srgb, var(--ui-background) 72%, transparent) 48%,
+        transparent
+    );
+    content: '';
+    pointer-events: none;
+}
+
+.preference-page-ambient,
+.auth-page-ambient {
+    background-image: radial-gradient(
+        ellipse 42rem 30rem at center,
+        color-mix(in srgb, var(--ui-primary) 9%, transparent),
+        transparent 72%
+    );
+    background-position: center;
+}
+
+.dark .preference-page-ambient,
+.dark .auth-page-ambient {
+    background-image: radial-gradient(
+        ellipse 42rem 30rem at center,
+        color-mix(in srgb, var(--ui-primary) 7%, transparent),
+        transparent 72%
+    );
+}
+
+.auth-page-ambient {
+    background-color: var(--ui-background);
+    background-attachment: fixed;
+}
+
+.auth-card {
+    border-color: color-mix(in srgb, var(--ui-border) 72%, var(--ui-primary));
+    background-color: color-mix(in srgb, var(--ui-surface) 96%, var(--ui-primary));
+}
+
+.dark .auth-card {
+    background-color: color-mix(in srgb, var(--ui-surface) 97%, var(--ui-primary));
+}
+
 .ui-primary-surface {
     background-color: var(--ui-primary);
     color: var(--ui-primary-foreground);
@@ -139,6 +227,120 @@
 }
 .dark .ui-accent-soft {
     background-color: color-mix(in srgb, var(--ui-accent) 14%, transparent);
+}
+
+/* Chat ambience belongs to the conversation page layer and remains centered
+   through empty and active states. The primary token follows saved palettes. */
+[data-conversation-chat]::before {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    background: radial-gradient(
+        ellipse 42rem 30rem at center,
+        color-mix(in srgb, var(--ui-primary) 9%, transparent),
+        transparent 72%
+    );
+    content: '';
+    pointer-events: none;
+}
+
+.dark [data-conversation-chat]::before {
+    background: radial-gradient(
+        ellipse 42rem 30rem at center,
+        color-mix(in srgb, var(--ui-primary) 7%, transparent),
+        transparent 72%
+    );
+}
+
+[data-conversation-chat][data-chat-active="true"]::after {
+    position: fixed;
+    z-index: 49;
+    inset-inline: 0;
+    bottom: 0;
+    height: 12rem;
+    background: linear-gradient(to bottom, transparent, var(--ui-background) 62%);
+    content: '';
+    pointer-events: none;
+}
+
+@media (min-width: 64rem) {
+    [data-conversation-chat][data-chat-active="true"].chat-sidebar-expanded::after {
+        inset-inline-start: 280px;
+    }
+
+    [data-conversation-chat][data-chat-active="true"].chat-sidebar-collapsed::after {
+        inset-inline-start: 72px;
+    }
+}
+
+[data-conversation-chat][data-chat-active="false"] [data-composer-form] {
+    position: absolute;
+    z-index: 1;
+    inset-inline: 0;
+    top: 50%;
+    padding-inline: 1rem;
+    transform: translateY(-50%);
+}
+
+[data-conversation-chat][data-chat-active="true"] [data-composer-form] {
+    position: fixed;
+    z-index: 50;
+    inset-inline: 0;
+    bottom: 0;
+    padding: 0 1rem calc(1rem + env(safe-area-inset-bottom));
+    pointer-events: none;
+}
+
+[data-conversation-chat][data-chat-active="true"] [data-empty-prompt] {
+    display: none;
+}
+
+[data-conversation-chat][data-chat-active="true"] [data-composer-form] .chat-composer-surface {
+    pointer-events: auto;
+}
+
+.chat-messages-with-composer {
+    padding-block-end: calc(16rem + env(safe-area-inset-bottom));
+}
+
+[data-conversation-chat][data-chat-active="true"] [data-scroll-to-bottom] {
+    position: absolute;
+    z-index: 51;
+    bottom: calc(100% + 0.5rem);
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: auto;
+}
+
+@media (min-width: 64rem) {
+    [data-conversation-chat][data-chat-active="true"] [data-composer-form].chat-composer-sidebar-expanded {
+        inset-inline-start: 280px;
+    }
+
+    [data-conversation-chat][data-chat-active="true"] [data-composer-form].chat-composer-sidebar-collapsed {
+        inset-inline-start: 72px;
+    }
+}
+
+.chat-user-message-container {
+    width: fit-content;
+    min-width: 0;
+    max-width: 90%;
+}
+
+.chat-user-bubble {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.chat-user-message-row {
+    direction: ltr;
+}
+
+[data-message].is-editing .chat-user-message-container {
+    width: 100%;
+    max-width: 100%;
 }
 
 /* Subtle scrollbars for containers that opt in (e.g. the sidebar list):
@@ -174,10 +376,65 @@
    visible in both schemes through the same token. */
 .ui-checkbox {
     accent-color: var(--ui-primary);
+    border-color: var(--ui-primary);
 }
 .ui-checkbox:focus-visible {
     outline: 2px solid var(--ui-ring);
     outline-offset: 2px;
+}
+
+/* Conversation row action trigger. The trigger is hidden by default on
+   touch devices and revealed only by a long press (see the Alpine handlers
+   in `conversation/list-item`); mouse users keep the original hover and
+   keyboard-focus behavior at desktop widths. The matching inline-end
+   padding keeps the revealed button clear of the title in RTL and LTR. */
+.conversation-item-row {
+    touch-action: manipulation;
+}
+.conversation-item-pressing {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+.conversation-actions-reveal {
+    opacity: 0;
+    pointer-events: none;
+}
+.conversation-actions-revealed,
+.conversation-actions-reveal:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+.conversation-item-actions {
+    display: block;
+    pointer-events: none;
+}
+.conversation-item-actions-revealed {
+    pointer-events: auto;
+}
+@media (min-width: 48rem) and (hover: hover) {
+    .conversation-item-actions {
+        pointer-events: auto;
+    }
+}
+@media (min-width: 48rem) and (max-width: 63.999rem) and (hover: hover) {
+    .conversation-actions-reveal {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+@media (min-width: 64rem) and (hover: hover) {
+    .group:hover .conversation-actions-reveal,
+    .group:focus-within .conversation-actions-reveal,
+    .conversation-actions-reveal:focus-visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+@media (hover: none), (pointer: coarse) {
+    .conversation-item-link {
+        padding-inline-end: 2.5rem;
+    }
 }
 
 /* ChatGPT-style pre-first-token indicator: three dots that pulse in
@@ -221,6 +478,23 @@
         opacity: 0.7;
     }
 }
+[data-assistant-draft] [wire\:stream]:not(:empty) ~ .typing-indicator {
+    display: none;
+}
+[data-assistant-regeneration] [wire\:stream]:not(:empty) ~ .typing-indicator {
+    display: none;
+}
+
+[data-streaming-text] [wire\:stream]:not(:empty) ~ .typing-indicator {
+    display: none;
+}
+[data-message].is-regenerating ~ [data-message] {
+                   display: none;
+}
+
+[data-message].is-streaming-edit ~ [data-message] {
+                   display: none;
+}
 
 /* Navigation loading gate (see app.js): while the gate class is present
    (the first ~250ms of a navigation) the framework-owned progress bar
@@ -231,11 +505,12 @@ html.nav-loading-pending #nprogress {
     display: none !important;
 }
 
-/* Assistant markdown body (server-rendered from SafeMarkdown only).
+/* Assistant markdown body (server-rendered from sanitized Markdown).
    Assistant bubbles keep their existing layout/typography; this only gives
    structural Markdown elements (headings, lists, tables, code, quotes,
    links) a readable rendering inside the same bubble. User messages stay
-   plain escaped text. All AI HTML is sanitized server-side first. */
+   plain escaped text. Raw HTML is escaped and unsafe links are disabled
+   server-side before rendering. */
 .ai-markdown {
     overflow-wrap: anywhere;
 }
@@ -313,6 +588,71 @@ html.nav-loading-pending #nprogress {
     background: none;
     padding: 0;
     font-size: inherit;
+}
+.ai-code-block {
+    margin-block: 0.85em;
+    direction: ltr;
+    text-align: left;
+    border: 1px solid var(--ui-border);
+    border-radius: 0.85rem;
+    overflow: hidden;
+    background-color: color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-surface));
+}
+.ai-code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.375rem 0.75rem;
+    border-bottom: 1px solid var(--ui-border);
+    background-color: color-mix(in srgb, var(--ui-foreground) 4%, transparent);
+}
+.ai-code-language {
+    overflow: hidden;
+    color: var(--ui-muted-foreground);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    text-overflow: ellipsis;
+    text-transform: lowercase;
+    white-space: nowrap;
+}
+.ai-code-copy {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 0.5rem;
+    padding: 0.2rem 0.45rem;
+    color: var(--ui-muted-foreground);
+    font-size: 0.6875rem;
+    transition: color 150ms ease, background-color 150ms ease;
+}
+.ai-code-copy:hover,
+.ai-code-copy:focus-visible {
+    color: var(--ui-foreground);
+    background-color: color-mix(in srgb, var(--ui-foreground) 7%, transparent);
+}
+.ai-code-copy:focus-visible {
+    outline: 2px solid var(--ui-ring);
+    outline-offset: 1px;
+}
+.ai-code-copy.is-copied {
+    color: var(--ui-success);
+}
+.ai-code-copy-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+.ai-code-block pre {
+    margin: 0;
+    padding: 0.85rem 1rem;
+    border-radius: 0;
+    background-color: transparent;
+}
+.ai-code-block code {
+    padding: 0;
+    background: none;
 }
 .ai-markdown code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

@@ -2,15 +2,17 @@
 
 namespace App\Services\Conversation;
 
+use App\Models\Conversation;
 use App\Models\User;
+use App\Services\Message\ConversationOperationLock;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
-use App\Services\Message\ConversationOperationLock;
+use Illuminate\Support\Facades\Gate;
 
 class ConversationBulkService
 {
     public function __construct(
-        private readonly ConversationOperationLock $operationLock = new ConversationOperationLock()
+        private readonly ConversationOperationLock $operationLock = new ConversationOperationLock
     ) {}
 
     public function deleteFor(User $user, array $ids): int
@@ -25,13 +27,17 @@ class ConversationBulkService
             $conversations = $user->conversations()
                 ->whereIn('id', $ids)
                 ->orderBy('id')
-                ->get(['id']);
+                ->get(['id', 'user_id']);
 
             if ($conversations->count() !== count($ids)) {
                 throw new AuthorizationException(
                     'One or more conversations do not belong to the user.'
                 );
             }
+
+            $conversations->each(
+                fn (Conversation $conversation) => Gate::forUser($user)->authorize('delete', $conversation)
+            );
 
             return $this->operationLock->runMany(
                 $conversations->all(),

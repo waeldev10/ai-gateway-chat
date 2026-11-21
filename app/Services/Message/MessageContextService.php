@@ -6,6 +6,7 @@ use App\Enums\MessageStatus;
 use App\Models\Conversation;
 use App\Models\Message;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -99,25 +100,37 @@ class MessageContextService
         Conversation $conversation,
         Message $message,
     ): ?Message {
-        $createdAt = $message->created_at;
-
-        return $conversation->messages()
-            ->where(function (Builder $query) use ($message, $createdAt): void {
-                if ($createdAt === null) {
-                    $query->where('id', '>', $message->getKey());
-
-                    return;
-                }
-
-                $query->where('created_at', '>', $createdAt)
-                    ->orWhere(function (Builder $query) use ($message, $createdAt): void {
-                        $query->where('created_at', $createdAt)
-                            ->where('id', '>', $message->getKey());
-                    });
-            })
+        return $this->orderedAfter($conversation, $message)
             ->orderBy('created_at')
             ->orderBy('id')
             ->first();
+    }
+
+    public function deleteAfter(
+        Conversation $conversation,
+        Message $message,
+    ): int {
+        return $this->orderedAfter($conversation, $message)->delete();
+    }
+
+    private function orderedAfter(
+        Conversation $conversation,
+        Message $message,
+    ): HasMany {
+        $createdAt = $message->created_at;
+        $query = $conversation->messages();
+
+        if ($createdAt === null) {
+            return $query->where('id', '>', $message->getKey());
+        }
+
+        return $query->where(function (Builder $query) use ($message, $createdAt): void {
+            $query->where('created_at', '>', $createdAt)
+                ->orWhere(function (Builder $query) use ($message, $createdAt): void {
+                    $query->where('created_at', $createdAt)
+                        ->where('id', '>', $message->getKey());
+                });
+        });
     }
 
     public function latestMessage(Conversation $conversation): ?Message

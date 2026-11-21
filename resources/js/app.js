@@ -12,6 +12,8 @@ function currentTheme() {
     }
 }
 
+
+
 function applyTheme() {
     const t = currentTheme();
     let dark = false;
@@ -112,4 +114,74 @@ window.addEventListener('storage', (e) => {
     if (e && e.key === 'ui_colors') {
         applyStoredUiColors();
     }
+});
+
+async function copyCodeText(text) {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+
+            return true;
+        }
+    } catch (e) {}
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    try {
+        return document.execCommand('copy');
+    } catch (e) {
+        return false;
+    } finally {
+        document.body.removeChild(textarea);
+    }
+}
+
+document.addEventListener('click', async (event) => {
+    const button = event.target instanceof Element
+        ? event.target.closest('[data-copy-code]')
+        : null;
+
+    if (!button) {
+        return;
+    }
+
+    if (button.classList.contains('is-copied')) {
+        return;
+    }
+
+    const block = button.closest('[data-code-block]');
+    const code = block?.querySelector('code');
+    const label = button.querySelector('[data-copy-label]');
+
+    if (!code) {
+        return;
+    }
+
+    const copied = await copyCodeText(code.textContent || '');
+
+    if (!copied) {
+        return;
+    }
+
+    const originalLabel = label?.textContent;
+
+    button.classList.add('is-copied');
+
+    if (label) {
+        label.textContent = 'تم النسخ';
+    }
+
+    window.setTimeout(() => {
+        button.classList.remove('is-copied');
+
+        if (label && originalLabel !== null) {
+            label.textContent = originalLabel;
+        }
+    }, 1600);
 });

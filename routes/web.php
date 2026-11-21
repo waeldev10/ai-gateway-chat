@@ -35,6 +35,12 @@ Route::middleware('auth')->group(function () {
     Route::get('conversations/create', [ConversationController::class, 'create'])
         ->name('conversations.create');
 
+    Route::get('conversations/search', [ConversationController::class, 'search'])
+        ->name('conversations.search');
+
+    Route::get('conversations/{conversation}', [ConversationController::class, 'show'])
+        ->name('conversations.show');
+
     Route::get('profile', [ProfileController::class, 'show'])
         ->name('profile.show');
 

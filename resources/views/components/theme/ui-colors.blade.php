@@ -7,16 +7,16 @@
         ? strtoupper(trim($v))
         : null;
     $uiLight = [
-        'primary' => $uiHex(config('ui.colors.defaults.light.primary')) ?? '#4F46E5',
+        'primary' => $uiHex(config('ui.colors.defaults.light.primary')) ?? '#0C5548',
         'primary_text' => $uiHex(config('ui.colors.defaults.light.primary_text')) ?? '#FFFFFF',
-        'accent' => $uiHex(config('ui.colors.defaults.light.accent')) ?? '#7C3AED',
-        'link' => $uiHex(config('ui.colors.defaults.light.link')) ?? '#4338CA',
+        'accent' => $uiHex(config('ui.colors.defaults.light.accent')) ?? '#23796A',
+        'link' => $uiHex(config('ui.colors.defaults.light.link')) ?? '#0C5548',
     ];
     $uiDark = [
-        'primary' => $uiHex(config('ui.colors.defaults.dark.primary')) ?? '#818CF8',
-        'primary_text' => $uiHex(config('ui.colors.defaults.dark.primary_text')) ?? '#0B1120',
-        'accent' => $uiHex(config('ui.colors.defaults.dark.accent')) ?? '#A78BFA',
-        'link' => $uiHex(config('ui.colors.defaults.dark.link')) ?? '#A5B4FC',
+        'primary' => $uiHex(config('ui.colors.defaults.dark.primary')) ?? '#63B4A5',
+        'primary_text' => $uiHex(config('ui.colors.defaults.dark.primary_text')) ?? '#06231D',
+        'accent' => $uiHex(config('ui.colors.defaults.dark.accent')) ?? '#80C8BA',
+        'link' => $uiHex(config('ui.colors.defaults.dark.link')) ?? '#8FDCCC',
     ];
 @endphp
 <style id="ui-colors">
