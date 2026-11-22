@@ -166,4 +166,4 @@ vendor/bin/pint --test
 
 ## الترخيص
 
-هذا المشروع مرخص بموجب MIT License.
+هذا المشروع مرخّص بموجب [رخصة MIT](LICENSE). [اقرأ النص الرسمي للرخصة](https://opensource.org/licenses/MIT).

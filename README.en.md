@@ -166,4 +166,4 @@ vendor/bin/pint --test
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](LICENSE). [Read the official license text](https://opensource.org/licenses/MIT).
