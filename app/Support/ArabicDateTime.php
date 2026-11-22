@@ -5,12 +5,6 @@ namespace App\Support;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
-/**
- * Single source for user-facing Arabic date/time strings.
- *
- * Formatting happens server-side with Carbon's `ar` locale and Eastern Arabic
- * digits, so Blade views never duplicate locale or timezone logic.
- */
 final class ArabicDateTime
 {
     /**

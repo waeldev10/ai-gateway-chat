@@ -15,13 +15,8 @@ use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
-   
-    public function register(): void
-    {
-        
-    }
+    public function register(): void {}
 
-  
     public function boot(): void
     {
         $this->registerPolicies();
@@ -61,8 +56,8 @@ class AppServiceProvider extends ServiceProvider
             $key = $request->user()?->getKey() ?? $request->ip();
 
             return Limit::perMinute(20)->by('ai-stream:'.$key);
-        });  
-        
+        });
+
         RateLimiter::for('api-ai', function (Request $request): Limit {
             $key = $request->user()?->getKey() ?? $request->ip();
 

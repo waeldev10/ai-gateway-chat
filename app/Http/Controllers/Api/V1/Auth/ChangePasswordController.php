@@ -11,9 +11,6 @@ use Illuminate\Validation\ValidationException;
 
 class ChangePasswordController extends Controller
 {
-    /**
-     * Handle the incoming request.
-     */
     public function __invoke(ChangePasswordRequest $request, ChangePasswordService $service): JsonResponse
     {
         $changed = $service->change(

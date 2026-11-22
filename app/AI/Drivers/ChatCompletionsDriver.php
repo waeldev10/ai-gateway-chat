@@ -9,7 +9,8 @@ use App\AI\DTOs\AiUsage;
 use Generator;
 use Psr\Http\Message\StreamInterface;
 
-/** يطابق الطلبات والردود مع Chat Completions API ويعيد النتائج أو أجزاء البث بصيغة التطبيق الموحدة. */
+/** هذا يطابق الطلبات والردود مع Chat Completions API،
+ * ويرجع النتايج او أجزاء البث بصيغة التطبيق الموحدة. */
 final class ChatCompletionsDriver extends HttpDriver
 {
     public function generate(AiRequest $request): AiResponse

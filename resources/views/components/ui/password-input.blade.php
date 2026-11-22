@@ -1,9 +1,4 @@
-{{-- Password input with an Alpine-only show/hide eye toggle.
-     Styling mirrors `components/input` (same light/dark/error states) plus
-     inline-end padding for the icon. Each instance owns its own `show` flag,
-     so fields toggle independently. Toggling only flips the input `type` —
-     the value is untouched and no Livewire request is sent (no `wire:`
-     directives in here). Button is keyboard-focusable with proper ARIA. --}}
+
 @props(['error' => false, 'showLabel' => 'إظهار كلمة المرور', 'hideLabel' => 'إخفاء كلمة المرور'])
 <div x-data="{ show: false }" class="relative mt-1.5">
     <input {{ $attributes->except(['type'])->merge(['class' => 'w-full rounded-xl border bg-surface px-3.5 py-2.5 pe-10 text-sm text-foreground placeholder:text-muted-foreground transition focus:outline-none focus:ring-2 '.($error ? 'border-destructive focus:border-destructive focus:ring-destructive/20' : 'border-input focus:border-ring focus:ring-ring/20')]) }} type="password" :type="show ? 'text' : 'password'" />

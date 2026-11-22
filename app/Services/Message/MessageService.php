@@ -7,12 +7,11 @@ use App\Enums\MessageRole;
 use App\Enums\MessageStatus;
 use App\Models\AiPersona;
 use App\Models\Conversation;
-use App\Models\Message;
 use App\Services\Conversation\ConversationTitleService;
 use Generator;
 use Illuminate\Support\Facades\DB;
 
-/** ينسق إرسال المستخدم، ويفوض حفظ الرسائل وبناء السياق والتوليد لخدماتها المختصة. */
+/** ينسق إرسال المستخدم، ويفوض حفظ الرسائل وبناء السياق والتوليد لخدماتها المختصة */
 class MessageService
 {
     public function __construct(
@@ -34,17 +33,6 @@ class MessageService
         );
     }
 
-    /**
-     * Persist the user message and stream the assistant reply while holding the
-     * conversation lock.
-     *
-     * @return Generator<int, string, mixed, array{
-     *     user_message: Message,
-     *     assistant_message: ?Message,
-     *     failed: bool,
-     *     connection_failed: bool
-     * }>
-     */
     public function stream(
         Conversation $conversation,
         string $content,
@@ -99,9 +87,6 @@ class MessageService
         ];
     }
 
-    /**
-     * @return array{0: Message, 1: array<int, array{role: string, content: string}>}
-     */
     private function persistUserMessage(Conversation $conversation, string $content): array
     {
         return DB::transaction(function () use ($conversation, $content): array {

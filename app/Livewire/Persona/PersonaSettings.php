@@ -15,15 +15,6 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Throwable;
 
-/**
- * Persona settings: the read-only system default plus the user's own
- * personas (create up to the configured limit / edit / toggle / delete).
- *
- * Only primitives are kept in public state, so Livewire never hydrates or
- * dehydrates Eloquent models between requests. The read-side data is exposed
- * through computed properties, which are evaluated lazily, cached for the
- * current request, and never serialized into the component snapshot.
- */
 class PersonaSettings extends Component
 {
     public string $name = '';
@@ -157,10 +148,6 @@ class PersonaSettings extends Component
         );
     }
 
-    /**
-     * Two-step delete: the first call arms confirmation on the row, the
-     * second call for the same id performs the deletion.
-     */
     public function remove(string $id, AiPersonaService $personas): void
     {
         if ($this->confirmingId !== $id) {
@@ -208,9 +195,6 @@ class PersonaSettings extends Component
         return app(AiPersonaService::class)->systemDefault();
     }
 
-    /**
-     * @return Collection<int, AiPersona>
-     */
     #[Computed]
     public function personas(): Collection
     {

@@ -9,11 +9,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SetApiLocale
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  Closure(Request): (Response)  $next
-     */
     public function handle(Request $request, Closure $next): Response
     {
         $previousLocale = App::getLocale();

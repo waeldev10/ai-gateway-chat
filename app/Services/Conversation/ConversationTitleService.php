@@ -11,7 +11,7 @@ use App\Models\Conversation;
 use Illuminate\Support\Str;
 use Throwable;
 
-/** يطلب عنوانًا موجزًا من طبقة الذكاء الاصطناعي لأول تبادل، ثم يسجله على المحادثة. */
+/** يطلب عنوان موجز من طبقة الذكاء الاصطناعي لأول رد ثم يسجله على المحادثة */
 class ConversationTitleService
 {
     public function __construct(private readonly AiService $aiService) {}

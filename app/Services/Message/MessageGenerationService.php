@@ -17,11 +17,10 @@ use App\Models\Message;
 use App\Services\Persona\AiPromptService;
 use Closure;
 use Generator;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
-/** يضيف تعليمات الشخصية للسياق، ويرسل الطلب إلى AiService، ثم يسجل حالته ويحفظ الرد أو أجزاء البث. */
+/** يضيف تعليمات الشخصية للسياق، ويرسل الطلب إلى AiService، ثم يسجل حالته ويحفظ الرد أو أجزاء البث */
 class MessageGenerationService
 {
     public function __construct(
@@ -148,14 +147,6 @@ class MessageGenerationService
         );
     }
 
-    /**
-     * Stream a generated assistant reply while recording the AI request.
-     *
-     * Failures are reported through the returned array instead of being thrown
-     * once streaming has started, because response headers may already be sent.
-     *
-     * @return Generator<int, string, mixed, array{assistant_message: ?Message, failed: bool, connection_failed: bool}>
-     */
     public function stream(
         Conversation $conversation,
         array $messages,
@@ -186,11 +177,6 @@ class MessageGenerationService
             );
 
             foreach ($this->aiService->stream($request) as $chunk) {
-                if ($this->isStopped($conversation)) {
-                    $this->clearStop($conversation);
-                    break;
-                }
-
                 if ($chunk->usage !== null) {
                     $usage = $chunk->usage;
                 }
@@ -332,20 +318,5 @@ class MessageGenerationService
     private function durationMs(float $startedAt): int
     {
         return max(0, (int) round((microtime(true) - $startedAt) * 1000));
-    }
-
-    private function isStopped(Conversation $conversation): bool
-    {
-        return (bool) Cache::get('message-stop:'.$conversation->getKey());
-    }
-
-    private function clearStop(Conversation $conversation): void
-    {
-        Cache::forget('message-stop:'.$conversation->getKey());
-    }
-
-    public function stop(Conversation $conversation): void
-    {
-        Cache::put('message-stop:'.$conversation->getKey(), true, now()->addMinutes(5));
     }
 }

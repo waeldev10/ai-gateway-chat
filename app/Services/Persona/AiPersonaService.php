@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
-/** يدير الشخصيات الافتراضية والمخصصة، بما يشمل التحقق والصلاحيات والتخزين المؤقت واختيار شخصية المحادثة. */
+/** يدير الشخصيات الافتراضية والمخصصة، بما يشمل التحقق والصلاحيات والتخزين المؤقت واختيار شخصية المحادثة */
 class AiPersonaService
 {
     private const CACHE_TTL_SECONDS = 3600;
@@ -35,9 +35,6 @@ class AiPersonaService
             ->get();
     }
 
-    /**
-     * @return Collection<int, AiPersona>
-     */
     public function customFor(User $user): Collection
     {
         return AiPersona::query()
@@ -272,12 +269,6 @@ class AiPersonaService
         }
     }
 
-    /**
-     * Make one custom persona active for the user and deactivate every other
-     * custom persona in the same transaction.
-     *
-     * @param  array<string, mixed>  $attributes
-     */
     private function activateExclusively(User $user, AiPersona $persona, array $attributes): AiPersona
     {
         DB::transaction(function () use ($user, $persona, $attributes): void {

@@ -8,7 +8,7 @@ use Closure;
 use Generator;
 use Illuminate\Support\Facades\Cache;
 
-/** ينسق العمليات المتزامنة على المحادثة بقفل مخزن مؤقت وقفل صف قاعدة البيانات، ويمتد قفله طوال استهلاك البث. */
+/** ينسق العمليات المتزامنة على المحادثة بقفل مخزن مؤقت وقفل صف قاعدة البيانات ويمتد قفله طوال استهلاك البث */
 final class ConversationOperationLock
 {
     public function run(Conversation $conversation, Closure $callback): mixed
@@ -39,14 +39,6 @@ final class ConversationOperationLock
         }
     }
 
-    /**
-     * Hold the conversation lock for as long as the returned generator is
-     * being consumed. The lock is acquired on first iteration and released
-     * when the generator finishes or is destroyed.
-     *
-     * @param  Closure(): Generator<mixed, mixed, mixed, mixed>  $callback
-     * @return Generator<mixed, mixed, mixed, mixed>
-     */
     public function runGenerator(Conversation $conversation, Closure $callback): Generator
     {
         $lock = Cache::lock(self::key($conversation), $this->ttlSeconds());

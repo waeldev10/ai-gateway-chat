@@ -1,7 +1,4 @@
-{{-- Persona settings: the system default is always active and read-only.
-     The user's own personas can be created up to the configured limit and
-     each one toggles independently. Every mutation is a single Livewire
-     action with unified toasts and two-step delete. --}}
+
 <div class="space-y-5">
     @if($this->systemDefault !== null)
         <div class="rounded-3xl border border-border/80 bg-surface/90 p-5 sm:p-6">

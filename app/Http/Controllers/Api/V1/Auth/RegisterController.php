@@ -11,9 +11,6 @@ use Illuminate\Http\JsonResponse;
 
 class RegisterController extends Controller
 {
-    /**
-     * Handle the incoming request.
-     */
     public function __invoke(RegisterRequest $request, RegisterService $service): JsonResponse
     {
         $user = $service->register($request->safe()->only(['name', 'email', 'password']));

@@ -1,7 +1,3 @@
-// import './stream-client.js';
-// import './chat-stream.js';
-// import './message-actions.js';
-// import './chat-history.js';
 
 function currentTheme() {
     try {

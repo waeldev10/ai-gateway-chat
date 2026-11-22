@@ -1,6 +1,4 @@
-{{-- Personal profile: header from Livewire state plus two forms.
-     Tab switching is Alpine-only so it never costs a server request.
-     Both saves are single Livewire actions with unified toasts. --}}
+
 <div x-data="{ tab: 'profile' }">
     <div class="rounded-3xl border border-border/80 bg-surface/90 p-5 sm:p-7">
         <div class="flex items-center gap-3.5">

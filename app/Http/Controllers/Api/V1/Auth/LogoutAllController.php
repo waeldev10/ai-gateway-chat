@@ -10,9 +10,6 @@ use Illuminate\Http\Request;
 
 class LogoutAllController extends Controller
 {
-    /**
-     * Handle the incoming request.
-     */
     public function __invoke(Request $request, LogoutAllService $service): JsonResponse
     {
         $service->logoutAll($request->user());

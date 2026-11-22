@@ -2,14 +2,12 @@
 
 namespace App\Http\Requests\Api\V1\Auth;
 
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 
 class RegisterRequest extends FormRequest
 {
-
     public function authorize(): bool
     {
         return true;

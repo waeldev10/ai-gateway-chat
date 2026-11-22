@@ -2,9 +2,7 @@
 
 namespace App\Livewire\Sidebar;
 
-use App\Models\Conversation;
 use App\Services\Conversation\ConversationSearchService;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
@@ -30,9 +28,6 @@ class SidebarConversations extends Component
     #[On('conversations-changed')]
     public function refreshList(): void {}
 
-    /**
-     * @return array{pinned: Collection<int, Conversation>, recent: Collection<int, Conversation>, hasMore: bool}
-     */
     #[Computed]
     public function groups(): array
     {

@@ -9,7 +9,7 @@ use App\AI\Drivers\GeminiInteractionsDriver;
 use App\AI\Drivers\ResponsesDriver;
 use App\Exceptions\AiException;
 
-/** يتحقق من إعدادات الاتصال وينشئ سائق البروتوكول الموافق لمزود الذكاء الاصطناعي. */
+/** يتحقق من إعدادات الاتصال وينشئ مشغل البروتوكول الموافق لمزود الذكاء الاصطناعي */
 class AiDriverFactory
 {
     public function make(string $connection): AiDriver

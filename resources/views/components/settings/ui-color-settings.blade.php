@@ -1,7 +1,6 @@
 
 @php
-    // Static editor fallback only: tokens are fixed, each read explicitly.
-    // Every value is validated as strict #RRGGBB before reaching markup.
+    
     $uiHex = static fn ($v) => is_string($v) && preg_match('/^#[0-9a-fA-F]{6}$/', trim($v)) === 1
         ? strtoupper(trim($v))
         : null;

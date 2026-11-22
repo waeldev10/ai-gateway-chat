@@ -1,9 +1,4 @@
-{{-- Compact theme switcher used by the Auth layout and the app settings modal.
-     It reuses the single localStorage-backed mechanism:
-     initial value from `window.__currentTheme()`, writes through the single
-     `window.__setTheme()` implementation in `resources/js/app.js`. The local
-     `theme` variable is a display mirror only — it is never written anywhere
-     except the shared preference, so no second theme state exists. --}}
+
 <div x-data="{
         theme: 'system',
         setTheme(value) {

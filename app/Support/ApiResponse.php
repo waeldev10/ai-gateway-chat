@@ -17,10 +17,6 @@ final class ApiResponse
         return self::success($resource, $message, $status, $headers);
     }
 
-    /**
-     * @param  ResourceCollection|array<int|string, mixed>  $collection
-     * @param  array<string, mixed>  $headers
-     */
     public static function collection(
         ResourceCollection|array $collection,
         ?string $message = null,
@@ -30,9 +26,6 @@ final class ApiResponse
         return self::success($collection, $message, $status, $headers);
     }
 
-    /**
-     * @param  array<string, mixed>  $headers
-     */
     public static function paginated(
         ResourceCollection $collection,
         ?string $message = null,
@@ -48,9 +41,6 @@ final class ApiResponse
         return response()->json($payload, $status, $headers);
     }
 
-    /**
-     * @param  array<string, mixed>  $headers
-     */
     public static function action(
         ?string $message = null,
         int $status = 200,
@@ -59,10 +49,6 @@ final class ApiResponse
         return self::success(null, $message, $status, $headers);
     }
 
-    /**
-     * @param  array<string, mixed>  $extra  Additional Problem Details members such as `errors` or `retry_after`.
-     * @param  array<string, mixed>  $headers
-     */
     public static function problem(
         int $status,
         string $title,
@@ -85,9 +71,6 @@ final class ApiResponse
         return response()->json([...$payload, ...$extra], $status, $headers);
     }
 
-    /**
-     * @param  array<string, mixed>  $headers
-     */
     private static function success(
         mixed $data,
         ?string $message,

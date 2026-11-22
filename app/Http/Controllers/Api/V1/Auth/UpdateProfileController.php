@@ -11,9 +11,6 @@ use Illuminate\Http\JsonResponse;
 
 class UpdateProfileController extends Controller
 {
-    /**
-     * Handle the incoming request.
-     */
     public function __invoke(UpdateProfileRequest $request, UpdateProfileService $service): JsonResponse
     {
         $user = $service->update($request->user(), $request->safe()->only(['name', 'email']));

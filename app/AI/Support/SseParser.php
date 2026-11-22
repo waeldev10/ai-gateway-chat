@@ -5,7 +5,9 @@ namespace App\AI\Support;
 use Generator;
 use Psr\Http\Message\StreamInterface;
 
-/** يقرأ تدفق HTTP وفق SSE ويجمع حقول event و data لإعادتها كأحداث كاملة للسائق. */
+/** يقرأ تدفق HTTP وفق SSE
+ * ويجمع حقول event و data
+ * ويرجعها أحداث كاملة للمشغل */
 final class SseParser
 {
     public function parse(StreamInterface $stream): Generator

@@ -7,10 +7,6 @@ use App\Http\Controllers\Personas\PersonaController;
 use App\Http\Controllers\Profile\ProfileController;
 use Illuminate\Support\Facades\Route;
 
-// Route::get('/', function () {
-//     return view('welcome');
-// });
-
 Route::get('/', function () {
     return auth()->check()
         ? redirect()->route('conversations.create')

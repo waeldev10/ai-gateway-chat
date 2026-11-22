@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
-/** يبني سجل الرسائل المكتملة ضمن حدود سياق الذكاء الاصطناعي، ويحدد الرسائل التالية أو يحذفها. */
+/** يبني سجل الرسائل المكتملة ضمن حدود سياق الذكاء الاصطناعي ويحدد الرسائل التالية أو يحذفها */
 class MessageContextService
 {
     public function completedHistory(

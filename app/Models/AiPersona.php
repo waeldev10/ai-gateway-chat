@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Database\Factories\AiPersonaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +11,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['user_id', 'name', 'system_prompt', 'is_active', 'is_default'])]
 class AiPersona extends Model
 {
-    /** @use HasFactory<AiPersonaFactory> */
     use HasFactory, HasUlids;
 
     public const SYSTEM_DEFAULT_NAME = 'Default Assistant';

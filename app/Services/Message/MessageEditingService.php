@@ -13,7 +13,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** يعيد بناء السياق من رسالة المستخدم المعدلة ويفوض استبدال رد المساعد أو بثه إلى خدمة التوليد. */
+/** يعيد بناء السياق من رسالة المستخدم المعدلة ويفوض استبدال رد المساعد أو بثه إلى خدمة التوليد */
 class MessageEditingService
 {
     public function __construct(

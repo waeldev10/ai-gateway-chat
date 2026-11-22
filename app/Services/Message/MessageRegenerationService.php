@@ -13,7 +13,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** يبني سياق إعادة التوليد من الرسالة المحددة ويفوض استبدال الرد أو بثه إلى خدمة التوليد. */
+/** يبني سياق إعادة التوليد من الرسالة المحددة ويفوض استبدال الرد أو بثه إلى خدمة التوليد */
 class MessageRegenerationService
 {
     public function __construct(
@@ -49,11 +49,6 @@ class MessageRegenerationService
         });
     }
 
-    /**
-     * Stream a regenerated assistant reply while holding the conversation lock.
-     *
-     * @return Generator<int, string, mixed, array{assistant_message: ?Message, failed: bool, connection_failed: bool}>
-     */
     public function stream(
         Conversation $conversation,
         Message $message,
@@ -86,9 +81,6 @@ class MessageRegenerationService
         );
     }
 
-    /**
-     * @return array{0: array<int, array{role: string, content: string}>, 1: ?Message}
-     */
     private function resolvePlan(Conversation $conversation, Message $message): array
     {
         [$history, $replace] = DB::transaction(function () use ($conversation, $message): array {

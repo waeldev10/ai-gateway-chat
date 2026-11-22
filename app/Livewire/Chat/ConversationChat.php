@@ -7,10 +7,10 @@ use App\Enums\MessageRole;
 use App\Exceptions\ConversationBusyException;
 use App\Http\Requests\Api\V1\Conversations\SendMessageRequest;
 use App\Models\Conversation;
+use App\Models\User;
 use App\Services\Conversation\ConversationService;
 use App\Services\Message\MessageContextService;
 use App\Services\Message\MessageEditingService;
-use App\Services\Message\MessageGenerationService;
 use App\Services\Message\MessageRegenerationService;
 use App\Services\Message\MessageService;
 use Illuminate\Contracts\View\View;
@@ -23,7 +23,7 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
 
-/** يدير حالة واجهة المحادثة، ويحمل الرسائل على دفعات ويفوض الإرسال والتحرير والتوليد إلى الخدمات. */
+/** يدير حالة واجهة المحادثة ويحمل الرسائل على دفعات ويسلم مسؤولية الإرسال والتحرير والتوليد إلى الخدمات */
 class ConversationChat extends Component
 {
     #[Locked]
@@ -103,7 +103,7 @@ class ConversationChat extends Component
         }
     }
 
-    public function loadOlderMessages(): void
+    public function loadOlderMessages(ConversationService $conversations): void
     {
         if (! $this->hasOlderMessages || $this->olderMessagesCreatedAt === null || $this->olderMessagesId === null) {
             return;
@@ -113,7 +113,7 @@ class ConversationChat extends Component
         abort_if($user === null, 403);
         abort_if($this->conversationId === null, 404);
 
-        $conversation = app(ConversationService::class)->findFor($user, $this->conversationId);
+        $conversation = $conversations->findFor($user, $this->conversationId);
         $this->authorize('view', $conversation);
 
         $olderMessages = $conversation->messages()
@@ -152,15 +152,10 @@ class ConversationChat extends Component
         $user = Auth::user();
         abort_if($user === null, 403);
 
-        $content = trim($this->draft);
-
-        $validator = Validator::make(
-            ['content' => $content],
-            (new SendMessageRequest)->rules(),
-        );
-
-        if ($validator->fails()) {
-            $this->addError('draft', (string) $validator->errors()->first('content'));
+        try {
+            $content = $this->validatedMessageContent($this->draft);
+        } catch (ValidationException $exception) {
+            $this->addError('draft', (string) ($exception->errors()['content'][0] ?? ''));
 
             return;
         }
@@ -196,9 +191,7 @@ class ConversationChat extends Component
             return;
         }
 
-        $conversation = $conversations->findFor($user, (string) $this->conversationId);
-        $this->authorize('sendMessage', $conversation);
-        $this->conversationId = (string) $conversation->id;
+        $conversation = $this->authorizedMessageConversation($conversations, $user);
         $titleBefore = $conversation->title;
 
         try {
@@ -209,6 +202,7 @@ class ConversationChat extends Component
             }
 
             $result = $stream->getReturn();
+
         } catch (ConversationBusyException) {
             $this->dispatch(
                 'toast',
@@ -218,13 +212,17 @@ class ConversationChat extends Component
             );
 
             return;
+
         } catch (ValidationException $exception) {
+
             foreach ($exception->errors() as $field => $errors) {
                 $this->addError($field === 'content' ? 'draft' : $field, (string) ($errors[0] ?? ''));
             }
 
             return;
+
         } catch (Throwable $exception) {
+
             report($exception);
 
             $this->refreshVisibleMessages($conversation);
@@ -244,8 +242,6 @@ class ConversationChat extends Component
 
         $this->dispatch('conversations-changed');
         $this->dispatch('conversation-chat-updated', id: (string) $conversation->id);
-
-        $conversation->refresh();
 
         if (blank($titleBefore) && filled($conversation->title)) {
             $this->dispatch('conversation-renamed', id: (string) $conversation->id, title: (string) $conversation->title);
@@ -272,21 +268,18 @@ class ConversationChat extends Component
         $this->dispatch('ai-provider-connection-restored');
     }
 
-    public function editMessage(MessageEditingService $editing, string $messageId, string $content): bool
-    {
+    public function editMessage(
+        ConversationService $conversations,
+        MessageEditingService $editing,
+        string $messageId,
+        string $content,
+    ): bool {
         $user = Auth::user();
         abort_if($user === null, 403);
-        abort_if($this->conversationId === null, 404);
 
-        $content = trim($content);
+        $conversation = $this->authorizedMessageConversation($conversations, $user);
 
-        Validator::make(
-            ['content' => $content],
-            (new SendMessageRequest)->rules(),
-        )->validate();
-
-        $conversation = app(ConversationService::class)->findFor($user, (string) $this->conversationId);
-        $this->authorize('sendMessage', $conversation);
+        $content = $this->validatedMessageContent($content);
 
         $message = $conversation->messages()->whereKey($messageId)->firstOrFail();
 
@@ -357,14 +350,15 @@ class ConversationChat extends Component
         return true;
     }
 
-    public function regenerateMessage(MessageRegenerationService $regenerating, string $messageId): bool
-    {
+    public function regenerateMessage(
+        ConversationService $conversations,
+        MessageRegenerationService $regenerating,
+        string $messageId,
+    ): bool {
         $user = Auth::user();
         abort_if($user === null, 403);
-        abort_if($this->conversationId === null, 404);
 
-        $conversation = app(ConversationService::class)->findFor($user, (string) $this->conversationId);
-        $this->authorize('sendMessage', $conversation);
+        $conversation = $this->authorizedMessageConversation($conversations, $user);
 
         $message = $conversation->messages()->whereKey($messageId)->firstOrFail();
 
@@ -435,19 +429,6 @@ class ConversationChat extends Component
         return true;
     }
 
-    public function stopGeneration(string $conversationId): void
-    {
-        $user = Auth::user();
-        abort_if($user === null, 403);
-
-        $conversation = app(ConversationService::class)->findFor($user, $conversationId);
-        $this->authorize('view', $conversation);
-
-        app(MessageGenerationService::class)->stop($conversation);
-
-        $this->dispatch('generation-stopped', id: $conversationId);
-    }
-
     public function render(ConversationService $conversations): View
     {
         $conversation = null;
@@ -497,6 +478,27 @@ class ConversationChat extends Component
         $oldestMessage = $latestMessages->first();
         $this->olderMessagesCreatedAt = $oldestMessage?->created_at->toDateTimeString();
         $this->olderMessagesId = $oldestMessage === null ? null : (string) $oldestMessage->id;
+    }
+
+    private function authorizedMessageConversation(ConversationService $conversations, User $user): Conversation
+    {
+        abort_if($this->conversationId === null, 404);
+
+        $conversation = $conversations->findFor($user, $this->conversationId);
+        $this->authorize('sendMessage', $conversation);
+        $this->conversationId = (string) $conversation->id;
+
+        return $conversation;
+    }
+
+    private function validatedMessageContent(string $content): string
+    {
+        $validated = Validator::make(
+            ['content' => trim($content)],
+            (new SendMessageRequest)->rules(),
+        )->validate();
+
+        return (string) $validated['content'];
     }
 
     private function refreshVisibleMessages(Conversation $conversation): void

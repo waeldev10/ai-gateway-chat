@@ -1,58 +1,169 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+<p align="center"><strong>العربية</strong> · <a href="./README.en.md">English</a></p>
+
+<h1 align="center">بوابة المحادثة الذكية</h1>
 
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+تطبيق تعليمي لبناء تجربة محادثة بالذكاء الاصطناعي عبر الويب وواجهة REST API، مع حفظ المحادثات ودعم عدة مزودي AI.
 </p>
 
-## About Laravel
+## لقطات من التطبيق
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+<p align="center">
+  <img src="app/screenshots/1.png" alt="إنشاء حساب بالوضع الفاتح" width="49%">
+  <img src="app/screenshots/2.png" alt="تسجيل الدخول بالوضع الداكن" width="49%">
+</p>
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+<p align="center">
+  <img src="app/screenshots/3.png" alt="صفحة محادثة جديدة" width="49%">
+  <img src="app/screenshots/4.png" alt="الملف الشخصي" width="49%">
+</p>
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+<p align="center">
+  <img src="app/screenshots/5.png" alt="إعدادات الشخصيات" width="49%">
+  <img src="app/screenshots/6.png" alt="رد يتضمن كتل أكواد قابلة للنسخ" width="49%">
+</p>
 
-## Learning Laravel
+<p align="center">
+  <img src="app/screenshots/7.png" alt="إعدادات المظهر والألوان" width="49%">
+  <img src="app/screenshots/8.png" alt="البحث وإدارة المحادثات" width="49%">
+</p>
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+<p align="center">
+  <img src="app/screenshots/9.png" alt="تأكيد حذف محادثة" width="49%">
+  <img src="app/screenshots/10.png" alt="محادثة مع رد المساعد" width="49%">
+</p>
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+<p align="center">
+  <img src="app/screenshots/11.png" alt="محادثة في الوضع الداكن" width="49%">
+  <img src="app/screenshots/12.png" alt="نافذة تأكيد حذف المحادثة" width="49%">
+</p>
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+<p align="center">
+  <img src="app/screenshots/13.png" alt="نافذة إعادة تسمية المحادثة" width="49%">
+  <img src="app/screenshots/14.png" alt="نتيجة بحث لا تحتوي على محادثات" width="49%">
+</p>
 
-## Agentic Development
+## المزايا
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+### واجهة الويب
+
+- تسجيل الحساب والدخول وإدارة الملف الشخصي.
+- إنشاء المحادثات والبحث فيها وتثبيتها وإعادة تسميتها وحذفها.
+- بث ردود المساعد مباشرة، وتحميل الرسائل الأقدم عند التمرير في المحادثات الطويلة.
+- تعديل رسائل المستخدم وإعادة توليد ردود المساعد.
+- إنشاء شخصيات للمساعد وإدارة الشخصية النشطة.
+- الوضعان الفاتح والداكن، مع تخصيص ألوان الواجهة ودعم العربية واتجاه RTL.
+- عرض كتل الأكواد مع زر نسخ.
+
+### واجهة API
+
+- API بإصدار `/api/v1` ومصادقة Sanctum باستخدام Bearer Token.
+- تسجيل الحساب والدخول وإبطال الرموز وإدارة الملف الشخصي وكلمة المرور.
+- إنشاء المحادثات وإدارتها والبحث فيها مع الترقيم الصفحي.
+- بدء محادثة برسالة أولى ورد، وإرسال الرسائل وتعديلها وإعادة توليد الردود.
+- جلب الرسائل بترقيم المؤشر، وإدارة شخصيات المساعد.
+- استجابات موحدة للأخطاء والتحقق من المدخلات.
+
+يدعم الويب بث ردود AI مباشرة، بينما تكون عمليات التوليد في API متزامنة. راجع [دليل API](docs/api/api.md) و[مخطط OpenAPI](docs/api/openapi.yaml) للتفاصيل والأمثلة.
+
+## التقنيات
+
+| الجزء | التقنيات |
+| --- | --- |
+| الخادم | PHP 8.3+، Laravel 13 |
+| الواجهة التفاعلية | Livewire 4، Alpine.js |
+| CSS وتجميع الأصول | Tailwind CSS 4، Vite 8 |
+| قاعدة البيانات | MySQL افتراضيًا وفق `.env.example`، مع Eloquent وmigrations |
+| مصادقة API | Laravel Sanctum |
+| الاختبارات | Pest |
+
+تستخدم واجهة الويب Livewire والخدمات المشتركة، وتستدعي طبقة AI المزود المحدد من الإعدادات. تستقبل واجهة API الطلبات عبر Form Requests وControllers وResources، ثم تستخدم الخدمات نفسها لمنطق المحادثات.
+
+## مزودو الذكاء الاصطناعي
+
+تدعم طبقة AI بروتوكولات Chat Completions وOpenAI Responses وAnthropic Messages وGemini Interactions. وتشمل إعدادات الاتصالات في `config/ai.php` ملفات مثل OpenAI وOpenRouter وAnthropic وGemini وDeepSeek وOllama وQwen وKimi وGrok.
+
+لإضافة مزود، أضف أسماء متغيراته إلى `.env.example` بصيغة `KEY=value` من دون وضع مفتاح فعلي، ثم أضف اتصالًا في `config/ai.php` يقرأ القيم عبر `env(...)` ويحدد `driver` و`api_key` و`base_url` و`model` و`timeout`، إضافة إلى إعدادات البروتوكول عند الحاجة. اتبع بنية الاتصالات الموجودة. استخدم أحد المشغلات الحالية إذا كان المزود يدعم بروتوكولًا مدعومًا؛ أما البروتوكول الجديد فيحتاج مشغّلًا وتسجيله في `AiDriverFactory`. بعد ذلك ضع القيم الفعلية محليًا في `.env` فقط، ولا ترفع مفاتيح API إلى Git.
+
+## التشغيل محليًا
+
+### المتطلبات
+
+- PHP 8.3 أو أحدث، مع إضافات PHP المطلوبة من Composer.
+- Composer.
+- MySQL وقاعدة بيانات يستطيع التطبيق الاتصال بها.
+- Node.js وnpm.
+
+### الإعداد
+
+من مجلد المشروع، ثبّت اعتماديات PHP:
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+إذا لم يكن ملف `.env` موجودًا، انسخ `.env.example` إليه. في PowerShell:
 
-## Contributing
+```powershell
+Copy-Item .env.example .env
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+اضبط اتصال قاعدة البيانات في `.env` وأنشئ قاعدة البيانات. يستخدم المثال الافتراضي الاسم `ai_gateway_chat`:
 
-## Code of Conduct
+```dotenv
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=ai_gateway_chat
+DB_USERNAME=your_username
+DB_PASSWORD=your_password
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+أنشئ مفتاح التطبيق:
 
-## Security Vulnerabilities
+```bash
+php artisan key:generate
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+اختر مزود AI واضبط متغيراته. مثال اتصال OpenAI:
 
-## License
+```dotenv
+AI_CONNECTION=openai
+OPENAI_API_KEY=your_api_key
+OPENAI_MODEL=your_model
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+أنشئ الجداول وسجّل الشخصية الافتراضية، ثم ثبّت اعتماديات الواجهة وابنِ الأصول:
+
+```bash
+php artisan migrate --seed
+npm install
+npm run build
+```
+
+### تشغيل وضع التطوير
+
+شغّل Laravel في نافذة طرفية:
+
+```bash
+php artisan serve
+```
+
+وفي نافذة أخرى شغّل Vite:
+
+```bash
+npm run dev
+```
+
+افتح `http://localhost:8000` وأنشئ حسابًا للبدء.
+
+## الاختبارات والتنسيق
+
+```bash
+php artisan test --compact
+vendor/bin/pint --test
+```
+
+## الترخيص
+
+هذا المشروع مرخص بموجب [MIT License](https://opensource.org/licenses/MIT).

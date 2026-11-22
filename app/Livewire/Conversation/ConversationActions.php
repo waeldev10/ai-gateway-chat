@@ -58,11 +58,6 @@ class ConversationActions extends Component
         $this->isPinned = $conversation->pinned_at !== null;
     }
 
-    /**
-     * Only fixed-conversation instances need to mirror state changed elsewhere.
-     *
-     * @return array<string, string>
-     */
     protected function getListeners(): array
     {
         if ($this->conversationId === null) {

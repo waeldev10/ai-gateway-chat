@@ -8,7 +8,6 @@ use Illuminate\Validation\ValidationException;
 
 trait HandlesRateLimiting
 {
-    
     private function resolveRateLimits(string $name, array $input = []): array
     {
         $request = clone request();
@@ -28,7 +27,6 @@ trait HandlesRateLimiting
             ->all();
     }
 
-
     private function ensureRateLimitNotExceeded(array $limits): void
     {
         foreach ($limits as $limit) {
@@ -41,7 +39,6 @@ trait HandlesRateLimiting
             }
         }
     }
-
 
     private function hitRateLimits(array $limits): void
     {
@@ -60,5 +57,4 @@ trait HandlesRateLimiting
 
         return false;
     }
-    
 }

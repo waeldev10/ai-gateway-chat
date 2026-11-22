@@ -9,7 +9,8 @@ use App\AI\DTOs\AiUsage;
 use Generator;
 use Psr\Http\Message\StreamInterface;
 
-/** يطابق الطلبات والردود مع Responses API ويعيد النتائج أو أجزاء البث بصيغة التطبيق الموحدة. */
+/** هذا يطابق الطلبات والردود مع Responses API،
+ * ويرجع النتايج ولا أجزاء البث بصيغة التطبيق الموحدة. */
 final class ResponsesDriver extends HttpDriver
 {
     public function generate(AiRequest $request): AiResponse

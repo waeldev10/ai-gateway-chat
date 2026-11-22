@@ -10,7 +10,8 @@ use App\Exceptions\AiException;
 use Generator;
 use Psr\Http\Message\StreamInterface;
 
-/** يطابق الطلبات والردود مع Gemini Interactions API ويعيد النتائج أو أجزاء البث بصيغة التطبيق الموحدة. */
+/** هذا يطابق الطلبات والردود مع Gemini Interactions API،
+ * ويرجع النتايج او أجزاء البث بصيغة التطبيق الموحدة. */
 final class GeminiInteractionsDriver extends HttpDriver
 {
     public function generate(AiRequest $request): AiResponse
@@ -260,10 +261,6 @@ final class GeminiInteractionsDriver extends HttpDriver
         throw $this->providerError($payload);
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
-     */
     private function withProviderError(array $payload): array
     {
         if (array_key_exists('error', $payload)) {

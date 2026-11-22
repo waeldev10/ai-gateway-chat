@@ -15,7 +15,9 @@ use Illuminate\Support\Str;
 use Psr\Http\Message\StreamInterface;
 use Throwable;
 
-/** يوفر للسائقين إرسال HTTP وقراءة SSE وتوحيد أخطاء الاتصال والمزود في استثناءات التطبيق. */
+/** هذا يوفر للمشغلات:
+ * إرسال HTTP وقراءة SSE
+ * وتوحيد أخطاء الاتصال والمزود في استثناءات التطبيق */
 abstract class HttpDriver implements AiDriver
 {
     private readonly SseParser $sseParser;

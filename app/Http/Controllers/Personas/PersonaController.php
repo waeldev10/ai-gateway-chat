@@ -11,5 +11,4 @@ class PersonaController extends Controller
     {
         return view('personas.index');
     }
-    
 }

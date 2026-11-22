@@ -7,7 +7,7 @@ use App\Models\User;
 use App\Services\Message\ConversationOperationLock;
 use Illuminate\Support\Facades\DB;
 
-/** ينفذ عمليات إنشاء المحادثة وقراءتها وتعديل عنوانها وتثبيتها وحذفها. */
+/** ينفذ عمليات إنشاء المحادثة وقراءتها وتعديل عنوانها وتثبيتها وحذفها */
 class ConversationService
 {
     public function __construct(
