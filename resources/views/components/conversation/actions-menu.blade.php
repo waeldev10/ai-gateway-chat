@@ -285,7 +285,7 @@
             <button
                 type="button"
                 role="menuitem"
-                @click="closeMenu(); window.dispatchEvent(new CustomEvent('conversation-delete-requested', { detail: { id: @js($conversationId), title: @js($conversationTitle), scope: @js($menuScope) } }))"
+                @click="closeMenu(); window.dispatchEvent(new CustomEvent('conversation-delete-requested', { detail: { id: @js($conversationId), title: @js($conversationTitle), url: @js($shareUrl), scope: @js($menuScope) } }))"
                 class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-sm text-destructive transition-colors hover:bg-destructive/10 focus-visible:bg-destructive/10 focus-visible:outline-none"
             >
                 <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

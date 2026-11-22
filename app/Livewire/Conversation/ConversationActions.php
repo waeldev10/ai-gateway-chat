@@ -167,7 +167,7 @@ class ConversationActions extends Component
         );
     }
 
-    public function delete(ConversationService $conversations, ?string $id = null): void
+    public function delete(ConversationService $conversations, ?string $id = null, bool $isActive = false): void
     {
         $id = $this->resolveConversationId($id);
         $user = Auth::user();
@@ -193,20 +193,20 @@ class ConversationActions extends Component
         }
 
         $this->dispatch('close-confirm-modal', id: $this->deleteModalId());
-        $this->dispatch('conversations-changed');
 
-        if ($this->isOpenConversation($id)) {
+        if ($isActive || $this->isOpenConversation($id)) {
             session()->flash('toast', [
                 'type' => 'success',
                 'title' => 'تم حذف المحادثة',
                 'message' => 'تم حذف المحادثة نهائياً.',
             ]);
 
-            $this->redirect(route('conversations.create'), navigate: true);
+            $this->redirectRoute('conversations.create');
 
             return;
         }
 
+        $this->dispatch('conversations-changed');
         $this->dispatch(
             'toast',
             type: 'success',

@@ -32,7 +32,7 @@ beforeEach(function () {
 });
 
 describe('editing user messages', function () {
-    it('edits the user message and regenerates its immediate assistant reply', function () {
+    it('edits the user message, regenerates its reply, and removes later messages', function () {
         $user = User::factory()->create();
         $conversation = Conversation::factory()->for($user)->create();
 
@@ -97,13 +97,13 @@ describe('editing user messages', function () {
             ->assertJsonPath('data.assistant_message.status', 'complete')
             ->assertJsonPath('message', 'تم تعديل الرسالة بنجاح.');
 
-        expect($conversation->messages()->count())->toBe(6)
+        expect($conversation->messages()->count())->toBe(4)
             ->and($target->refresh()->content)->toBe('Edited question')
             ->and($targetAssistant->refresh()->content)->toBe('Edited answer')
             ->and($priorUser->refresh()->content)->toBe('Prior question')
             ->and($priorAssistant->refresh()->content)->toBe('Prior answer')
-            ->and($laterUser->refresh()->content)->toBe('Later question')
-            ->and($laterAssistant->refresh()->content)->toBe('Later answer');
+            ->and($conversation->messages()->whereKey($laterUser->id)->exists())->toBeFalse()
+            ->and($conversation->messages()->whereKey($laterAssistant->id)->exists())->toBeFalse();
 
         $aiRequest = AiRequestRecord::query()->sole();
 
@@ -200,6 +200,18 @@ describe('editing user messages', function () {
             'status' => MessageStatus::Complete,
             'created_at' => now()->subMinute(),
         ]);
+        $laterUser = Message::factory()->for($conversation)->create([
+            'role' => MessageRole::User,
+            'content' => 'Later question',
+            'status' => MessageStatus::Complete,
+            'created_at' => now(),
+        ]);
+        $laterAssistant = Message::factory()->for($conversation)->create([
+            'role' => MessageRole::Assistant,
+            'content' => 'Later answer',
+            'status' => MessageStatus::Complete,
+            'created_at' => now()->addSecond(),
+        ]);
 
         $this->mock(AiService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('generate')
@@ -214,9 +226,11 @@ describe('editing user messages', function () {
             ->assertStatus(502)
             ->assertJsonPath('code', 'provider_failed');
 
-        expect($conversation->messages()->count())->toBe(2)
+        expect($conversation->messages()->count())->toBe(4)
             ->and($target->refresh()->content)->toBe('Original question')
-            ->and($assistant->refresh()->content)->toBe('Original answer');
+            ->and($assistant->refresh()->content)->toBe('Original answer')
+            ->and($conversation->messages()->whereKey($laterUser->id)->exists())->toBeTrue()
+            ->and($conversation->messages()->whereKey($laterAssistant->id)->exists())->toBeTrue();
 
         $aiRequest = AiRequestRecord::query()->sole();
 

@@ -11,8 +11,8 @@ use App\Models\Message;
 use App\Services\Conversation\ConversationTitleService;
 use Generator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
+/** ينسق إرسال المستخدم، ويفوض حفظ الرسائل وبناء السياق والتوليد لخدماتها المختصة. */
 class MessageService
 {
     public function __construct(
@@ -41,7 +41,8 @@ class MessageService
      * @return Generator<int, string, mixed, array{
      *     user_message: Message,
      *     assistant_message: ?Message,
-     *     failed: bool
+     *     failed: bool,
+     *     connection_failed: bool
      * }>
      */
     public function stream(
@@ -63,46 +64,17 @@ class MessageService
                 );
 
                 if (blank($conversation->title) && ! $result['failed'] && $result['assistant_message'] !== null) {
-                    $this->titles->maybeGenerate($conversation, $content, $result['assistant_message']->content);
+                    $this->titles->maybeGenerate($conversation, $content, $result['assistant_message']->content, $source);
                 }
 
                 return [
                     'user_message' => $userMessage,
                     'assistant_message' => $result['assistant_message'],
                     'failed' => $result['failed'],
+                    'connection_failed' => $result['connection_failed'],
                 ];
             },
         );
-    }
-
-    public function continueConversation(
-        Conversation $conversation,
-        AiSource $source = AiSource::Api,
-        ?AiPersona $persona = null,
-    ): Message {
-        return $this->operationLock->run($conversation, function () use ($conversation, $source, $persona): Message {
-            $history = DB::transaction(function () use ($conversation): array {
-                $lockedConversation = $this->operationLock->lockForUpdate($conversation);
-
-                if ($this->contextService->latestMessage($lockedConversation)?->status === MessageStatus::Pending) {
-                    throw ValidationException::withMessages([
-                        'conversation' => 'لا يمكن متابعة المحادثة لأن آخر رسالة قيد المعالجة.',
-                    ]);
-                }
-
-                $history = $this->contextService->completedHistory($lockedConversation);
-
-                if ($history === []) {
-                    throw ValidationException::withMessages([
-                        'conversation' => 'لا توجد رسائل مكتملة لمتابعة المحادثة.',
-                    ]);
-                }
-
-                return $history;
-            });
-
-            return $this->generationService->generate($conversation, $history, $source, null, $persona);
-        });
     }
 
     private function sendLocked(

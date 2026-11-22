@@ -8,6 +8,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
+/** يبني قوائم المحادثات المثبتة والحديثة ونتائج البحث الخاصة بالمستخدم. */
 class ConversationSearchService
 {
     public const SIDEBAR_LIMIT = 10;

@@ -13,6 +13,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
+/** يبني سياق إعادة التوليد من الرسالة المحددة ويفوض استبدال الرد أو بثه إلى خدمة التوليد. */
 class MessageRegenerationService
 {
     public function __construct(
@@ -26,18 +27,32 @@ class MessageRegenerationService
         Message $message,
         AiSource $source = AiSource::Api,
         ?AiPersona $persona = null,
+        bool $branch = false,
     ): Message {
-        return $this->operationLock->run($conversation, function () use ($conversation, $message, $source, $persona): Message {
+        return $this->operationLock->run($conversation, function () use ($conversation, $message, $source, $persona, $branch): Message {
             [$history, $replace] = $this->resolvePlan($conversation, $message);
 
-            return $this->generationService->generate($conversation, $history, $source, $replace, $persona);
+            $beforePersist = $branch && $replace !== null
+                ? function () use ($conversation, $replace): void {
+                    $this->contextService->deleteAfter($conversation, $replace);
+                }
+            : null;
+
+            return $this->generationService->generate(
+                $conversation,
+                $history,
+                $source,
+                $replace,
+                $persona,
+                $beforePersist,
+            );
         });
     }
 
     /**
      * Stream a regenerated assistant reply while holding the conversation lock.
      *
-     * @return Generator<int, string, mixed, array{assistant_message: ?Message, failed: bool}>
+     * @return Generator<int, string, mixed, array{assistant_message: ?Message, failed: bool, connection_failed: bool}>
      */
     public function stream(
         Conversation $conversation,

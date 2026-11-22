@@ -15,7 +15,6 @@ class SendMessageRequest extends FormRequest
     {
         return [
             'content' => ['required', 'string', 'min:1', 'max:10000'],
-            'persona_id' => ['sometimes', 'nullable', 'ulid'],
         ];
     }
 }

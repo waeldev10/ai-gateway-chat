@@ -28,7 +28,7 @@ tags:
   - name: Conversations
     description: Conversation listing, search, creation, retrieval, updates, deletion, bulk deletion, pinning, and unpinning.
   - name: Messages
-    description: Message listing, sending, continuation, editing, and regeneration.
+    description: Message listing, sending, editing, and regeneration.
   - name: Personas
     description: AI persona listing, creation, retrieval, updates, deletion, activation, and deactivation.
 paths:
@@ -437,7 +437,10 @@ paths:
         - Conversations
       operationId: createConversation
       summary: Create a conversation
-      description: Creates a conversation owned by the authenticated user.
+      description: |
+        Creates an empty conversation owned by the authenticated user. To
+        create a conversation together with its first message and reply, use
+        POST /api/v1/conversations/start.
       security:
         - bearerAuth: []
       requestBody:
@@ -527,30 +530,67 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
-  /api/v1/conversations/search:
-    get:
+  /api/v1/conversations/start:
+    post:
       tags:
         - Conversations
-      operationId: searchConversations
-      summary: Search the authenticated user's conversations
+      operationId: startConversation
+      summary: Create a conversation and send its first message
       description: |
-        Behaves like conversation listing. Use q or search to filter the
-        authenticated user's conversations by title. q is used only when search
-        is absent.
+        Creates a conversation, sends its first user message, generates the
+        assistant reply, and generates a title from the exchange in one
+        synchronous API request. If assistant reply generation fails, the
+        conversation and user message remain saved and the API returns 502.
+        If title generation fails or returns blank text, a shortened version
+        of the first user message is used as the title. The active custom
+        persona is selected automatically, falling back to the system default.
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/SearchQuery'
-        - $ref: '#/components/parameters/QQuery'
-        - $ref: '#/components/parameters/PerPageQuery'
-        - $ref: '#/components/parameters/PageQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+            examples:
+              startConversation:
+                summary: Start a conversation
+                value:
+                  content: "Plan my trip to Japan"
       responses:
-        '200':
-          description: Paginated matching conversations.
+        '201':
+          description: Conversation created with its first message exchange.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ConversationListResponse'
+                $ref: '#/components/schemas/ConversationStartResponse'
+              examples:
+                started:
+                  summary: Conversation started
+                  value:
+                    data:
+                      conversation:
+                        id: "01JZ9M0R6V8X3K4P5Q7S9T2W6A"
+                        title: "Japan Trip"
+                        is_pinned: false
+                        pinned_at: null
+                        created_at: "2026-11-13T10:14:00+00:00"
+                        updated_at: "2026-11-13T10:14:05+00:00"
+                      user_message:
+                        id: "01JZ9M0R6V8X3K4P5Q7S9T2W6B"
+                        role: "user"
+                        content: "Plan my trip to Japan"
+                        status: "complete"
+                        created_at: "2026-11-13T10:14:00+00:00"
+                        updated_at: "2026-11-13T10:14:00+00:00"
+                      assistant_message:
+                        id: "01JZ9M0R6V8X3K4P5Q7S9T2W6C"
+                        role: "assistant"
+                        content: "Visit Kyoto in spring."
+                        status: "complete"
+                        created_at: "2026-11-13T10:14:05+00:00"
+                        updated_at: "2026-11-13T10:14:05+00:00"
+                    message: "تم إنشاء المحادثة وإرسال الرسالة بنجاح."
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '422':
@@ -559,6 +599,8 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
+        '502':
+          $ref: '#/components/responses/ProviderFailed'
   /api/v1/conversations/{conversation}:
     get:
       tags:
@@ -863,9 +905,11 @@ paths:
       summary: Send a message and generate an assistant reply
       description: |
         Persists a complete user message and generates a complete assistant
-        reply. If the conversation title is blank, the first user message titles
-        it. If the AI provider fails, the user message remains persisted, no
-        assistant message is created, and the API returns 502.
+        reply synchronously. API message sends do not automatically title the
+        conversation. If the AI provider fails, the user message remains
+        persisted, no assistant message is created, and the API returns 502.
+        The active custom persona is selected automatically, falling back to
+        the system default.
       security:
         - bearerAuth: []
       parameters:
@@ -881,7 +925,6 @@ paths:
                 summary: Send a message
                 value:
                   content: "Hello there"
-                  persona_id: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
       responses:
         '201':
           description: User message persisted and assistant reply generated.
@@ -925,66 +968,6 @@ paths:
           $ref: '#/components/responses/ServerError'
         '502':
           $ref: '#/components/responses/ProviderFailed'
-  /api/v1/conversations/{conversation}/messages/continue:
-    post:
-      tags:
-        - Messages
-      operationId: continueConversation
-      summary: Continue a conversation
-      description: |
-        Generates a new assistant reply from completed message history without
-        adding a new user message. Fails with 422 when there are no completed
-        messages or when the latest message is still pending.
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/ConversationId'
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ContinueConversationRequest'
-            examples:
-              continue:
-                summary: Continue with a persona
-                value:
-                  persona_id: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
-      responses:
-        '200':
-          description: Assistant reply generated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MessageResponse'
-              examples:
-                continued:
-                  summary: Continuation succeeded
-                  value:
-                    data:
-                      id: "01JZ9M0R6V8X3K4P5Q7S9T2W6C"
-                      role: "assistant"
-                      content: "Continued answer"
-                      status: "complete"
-                      created_at: "2026-11-13T10:15:00+00:00"
-                      updated_at: "2026-11-13T10:15:00+00:00"
-                    message: "تم متابعة المحادثة بنجاح."
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/ConversationBusy'
-        '422':
-          $ref: '#/components/responses/ValidationFailed'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/ServerError'
-        '502':
-          $ref: '#/components/responses/ProviderFailed'
   /api/v1/conversations/{conversation}/messages/{message}:
     patch:
       tags:
@@ -994,9 +977,12 @@ paths:
       description: |
         Edits a user message and regenerates its immediate assistant reply. If
         the user message is the latest message, an assistant reply is created.
-        Later messages are preserved. Editing an assistant message returns 403.
-        If the next message is not an assistant message, the edit fails with
-        422. Provider failure rolls back the user edit and assistant replacement.
+        On success, every message after the replaced assistant reply is deleted
+        to match the Web chat's branch behavior. Editing an assistant message
+        returns 403. If the next message is not an assistant message, the edit
+        fails with 422. Provider failure leaves all messages unchanged. The
+        active custom persona is selected automatically, falling back to the
+        system default.
       security:
         - bearerAuth: []
       parameters:
@@ -1063,7 +1049,10 @@ paths:
       summary: Edit a user message and regenerate its reply
       description: |
         PUT alternative for editing a user message and regenerating its
-        immediate assistant reply.
+        immediate assistant reply. On success, messages after the replaced
+        assistant reply are deleted. Provider failure leaves all messages
+        unchanged. The active custom persona is selected automatically,
+        falling back to the system default.
       security:
         - bearerAuth: []
       parameters:
@@ -1107,8 +1096,11 @@ paths:
       description: |
         Regenerates an assistant message in place, or the assistant reply
         following a user message. A user target must be complete. When the user
-        target is the latest message, a new assistant reply is created. Provider
-        failure leaves every message unchanged.
+        target is the latest message, a new assistant reply is created. On
+        success, messages after the replaced assistant reply are deleted to
+        match the Web chat's branch behavior. Provider failure leaves every
+        message unchanged. The active custom persona is selected automatically,
+        falling back to the system default.
       security:
         - bearerAuth: []
       parameters:
@@ -1122,9 +1114,8 @@ paths:
               $ref: '#/components/schemas/RegenerateMessageRequest'
             examples:
               regenerate:
-                summary: Regenerate with a persona
-                value:
-                  persona_id: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+                summary: Regenerate a response
+                value: {}
       responses:
         '200':
           description: Assistant response regenerated.
@@ -1212,7 +1203,8 @@ paths:
         Creates a custom persona owned by the authenticated user. The name is
         trimmed and whitespace-squished. The system prompt is trimmed and line
         endings are normalized. Creation is limited by the configured maximum
-        number of custom personas.
+        number of custom personas. If created active, it deactivates the user's
+        other active custom personas.
       security:
         - bearerAuth: []
       requestBody:
@@ -1422,9 +1414,10 @@ paths:
       operationId: activatePersona
       summary: Activate a custom persona
       description: |
-        Activates an owned custom persona. Activating an already active persona
-        is a no-op. The system default persona cannot be activated through this
-        endpoint.
+        Activates an owned custom persona and deactivates the user's other
+        active custom personas. Calling this for the already active persona
+        also enforces that only it is active. The system default persona cannot
+        be activated through this endpoint.
       security:
         - bearerAuth: []
       parameters:
@@ -1670,7 +1663,7 @@ components:
                 detail: "هناك عملية أخرى قيد التنفيذ على هذه المحادثة. يرجى إعادة المحاولة لاحقاً."
                 code: "conversation_busy"
     ProviderFailed:
-      description: The configured AI provider could not produce a response.
+      description: The configured AI provider could not produce a response. A connection failure uses provider_connection_failed; other provider errors use provider_failed.
       content:
         application/json:
           schema:
@@ -1684,6 +1677,14 @@ components:
                 status: 502
                 detail: "تعذر الحصول على رد من مزود الذكاء الاصطناعي. يرجى المحاولة لاحقًا."
                 code: "provider_failed"
+            providerConnectionFailed:
+              summary: AI provider connection failure
+              value:
+                type: "about:blank"
+                title: "AI Provider Error"
+                status: 502
+                detail: "تعذر الحصول على رد من مزود الذكاء الاصطناعي. يرجى المحاولة لاحقًا."
+                code: "provider_connection_failed"
     TooManyRequests:
       description: A rate limit was exceeded.
       headers:
@@ -1829,6 +1830,7 @@ components:
             - string
             - 'null'
           maxLength: 255
+          description: Standard API message sends do not automatically generate this title. The start endpoint generates it from the first exchange.
           example: "Planning a trip"
         is_pinned:
           type: boolean
@@ -1861,6 +1863,28 @@ components:
         message:
           type: string
           example: "تم تحديث المحادثة بنجاح."
+    ConversationStartResponse:
+      type: object
+      required:
+        - data
+        - message
+      properties:
+        data:
+          type: object
+          required:
+            - conversation
+            - user_message
+            - assistant_message
+          properties:
+            conversation:
+              $ref: '#/components/schemas/Conversation'
+            user_message:
+              $ref: '#/components/schemas/Message'
+            assistant_message:
+              $ref: '#/components/schemas/Message'
+        message:
+          type: string
+          example: "تم إنشاء المحادثة وإرسال الرسالة بنجاح."
     PageLinks:
       type: object
       required:
@@ -2038,7 +2062,7 @@ components:
           $ref: '#/components/schemas/Message'
         message:
           type: string
-          example: "تم متابعة المحادثة بنجاح."
+          example: "تم إعادة توليد الرد بنجاح."
     MessageExchange:
       type: object
       required:
@@ -2312,23 +2336,6 @@ components:
           minLength: 1
           maxLength: 10000
           example: "Hello there"
-        persona_id:
-          type:
-            - string
-            - 'null'
-          pattern: "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
-          description: Optional visible persona identifier.
-          example: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
-    ContinueConversationRequest:
-      type: object
-      properties:
-        persona_id:
-          type:
-            - string
-            - 'null'
-          pattern: "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
-          description: Optional visible persona identifier.
-          example: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
     UpdateMessageRequest:
       type: object
       required:
@@ -2339,23 +2346,8 @@ components:
           minLength: 1
           maxLength: 10000
           example: "Edited question"
-        persona_id:
-          type:
-            - string
-            - 'null'
-          pattern: "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
-          description: Optional visible persona identifier.
-          example: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
     RegenerateMessageRequest:
       type: object
-      properties:
-        persona_id:
-          type:
-            - string
-            - 'null'
-          pattern: "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
-          description: Optional visible persona identifier.
-          example: "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
     StorePersonaRequest:
       type: object
       required:

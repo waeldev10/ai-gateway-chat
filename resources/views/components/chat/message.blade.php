@@ -290,7 +290,7 @@
             </div>
         </div>
     @else
-        <div class="flex w-full items-start gap-3" dir="auto">
+        <div class="flex w-full items-start gap-3" dir="rtl">
             <div class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-primary" aria-hidden="true">
                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z" />
@@ -298,7 +298,7 @@
                 </svg>
             </div>
 
-            <div class="min-w-0 flex-1">
+            <div class="min-w-0 flex-1" dir="rtl">
                 @if ($isFailed)
                     <div class="mb-1.5">
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-0.5 text-[11px] font-medium text-destructive">
@@ -312,7 +312,7 @@
                 @endif
 
                 <div class="mt-1 text-sm leading-7 text-foreground" :aria-busy="regenerating || streamingEdit">
-                    <div x-show="! regenerating && ! streamingEdit" class="ai-markdown break-words">{!! $html !!}</div>
+                    <div x-show="! regenerating && ! streamingEdit" class="ai-markdown break-words" dir="auto">{!! $html !!}</div>
 
                     <div x-show="regenerating && ! streamingEdit" data-assistant-regeneration class="flex flex-col gap-1">
                         <div

@@ -76,16 +76,20 @@ describe('search and pagination', function () {
             ->assertJsonPath('meta.total', 1);
     });
 
-    it('supports the search route and q alias', function () {
+    it('supports the q query alias and uses the conversation collection route', function () {
         $user = User::factory()->create();
         $match = Conversation::factory()->for($user)->create(['title' => 'Arabic study notes']);
         Conversation::factory()->for($user)->create(['title' => 'Cooking recipes']);
 
         $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/conversations/search?q=study')
+            ->getJson('/api/v1/conversations?q=study')
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $match->id);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/conversations/search?q=study')
+            ->assertNotFound();
     });
 
     it('validates search and pagination parameters', function () {
@@ -113,6 +117,5 @@ describe('search and pagination', function () {
             ->assertJsonPath('code', 'unauthenticated');
     })->with([
         '/api/v1/conversations',
-        '/api/v1/conversations/search',
     ]);
 });

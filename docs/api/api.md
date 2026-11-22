@@ -167,7 +167,7 @@ Common error codes:
 | 422 | `validation_failed` | Request validation failed. `errors` is present. |
 | 429 | `rate_limited` | A rate limit was exceeded. `retry_after` is present when available. |
 | 500 | `server_error` | An unexpected server error occurred. Internal details are not exposed. |
-| 502 | `provider_failed` | The configured AI provider could not produce a response. |
+| 502 | `provider_failed`, `provider_connection_failed` | The provider could not produce a response, or the server could not reach it. |
 
 Other HTTP statuses use `http_error` with the original status code.
 
@@ -195,6 +195,8 @@ AI provider failure example (`502`):
 }
 ```
 
+When the server cannot establish a connection to the AI provider, the same safe response uses `provider_connection_failed` as its `code`. API clients can map this code to a connection notice without exposing provider or exception details.
+
 ## Rate limiting
 
 Keys use the normalized email (lowercase, trimmed) and client IP where appropriate. Authenticated general API limits are keyed by user ID.
@@ -205,7 +207,7 @@ Keys use the normalized email (lowercase, trimmed) and client IP where appropria
 | `login` (credentials) | `POST /api/v1/auth/login` | 5 requests per minute per normalized email and IP |
 | `login` (IP guard) | `POST /api/v1/auth/login` | 20 requests per minute per IP |
 | `api` | All protected API routes | 60 requests per minute per authenticated user, or per IP for unauthenticated requests |
-| `api-ai` | `POST .../messages`, `POST .../messages/continue`, `PATCH|PUT .../messages/{message}`, `POST .../messages/{message}/regenerate` | 20 requests per minute per authenticated user |
+| `api-ai` | `POST /conversations/start`, `POST .../messages`, `PATCH|PUT .../messages/{message}`, `POST .../messages/{message}/regenerate` | 20 requests per minute per authenticated user |
 
 AI message operations are also covered by the general `api` limiter, so the practical limit for those endpoints is 20 requests per minute.
 
@@ -484,7 +486,7 @@ Conversation fields:
 | Field | Type | Nullable | Description |
 |---|---|---:|---|
 | `id` | string (ULID) | no | Conversation identifier. |
-| `title` | string | yes | Conversation title. It is auto-generated from the first user message when blank. |
+| `title` | string | yes | Conversation title. API requests do not generate it automatically; set it through the conversation update endpoint. |
 | `is_pinned` | boolean | no | Whether the conversation is pinned. |
 | `pinned_at` | string (ISO 8601) | yes | Pin timestamp, or `null` when not pinned. |
 | `created_at` | string (ISO 8601) | yes | Creation timestamp. |
@@ -549,14 +551,12 @@ Errors: `401 unauthenticated`, `422 validation_failed`, `429 rate_limited`, `500
 
 ### Search conversations
 
-`GET /api/v1/conversations/search` (authenticated)
-
-Behaves exactly like `GET /api/v1/conversations`, including pagination and ordering. Use the `q` or `search` query parameter to filter the authenticated user's conversations by title.
+Search uses the conversation list endpoint: `GET /api/v1/conversations` (authenticated). Pass `search` (or its `q` alias) in the query string to filter titles. Pagination and ordering are the same as an unfiltered list.
 
 Example request:
 
 ```http
-GET /api/v1/conversations/search?q=study&per_page=10
+GET /api/v1/conversations?search=study&per_page=10
 ```
 
 Success: `200 OK` with the same page-based pagination structure as conversation listing.
@@ -567,7 +567,7 @@ Errors: `401 unauthenticated`, `422 validation_failed`, `429 rate_limited`, `500
 
 `POST /api/v1/conversations` (authenticated)
 
-Creates a conversation owned by the authenticated user. If no title is supplied, the conversation starts untitled and is titled from the first user message later.
+Creates an empty conversation owned by the authenticated user. This endpoint does not send a message or generate a title. To create a conversation together with its first message and reply, use `POST /api/v1/conversations/start`.
 
 Request body:
 
@@ -600,6 +600,62 @@ Success: `201 Created`
 ```
 
 Errors: `401 unauthenticated`, `422 validation_failed`, `429 rate_limited`, `500 server_error`.
+
+### Create a conversation with its first message
+
+`POST /api/v1/conversations/start` (authenticated)
+
+Creates a conversation, sends its first user message, generates the assistant reply, and generates a title from the exchange in one API request. Generation is synchronous. If generating the assistant reply fails, the conversation and user message remain saved and the API returns `502 provider_failed`. If title generation fails or returns blank text, the first user message is shortened and used as the title.
+
+Request body:
+
+| Field | Type | Required | Rules |
+|---|---|---:|---|
+| `content` | string | yes | 1-10,000 characters. |
+
+Example request:
+
+```json
+{
+  "content": "Plan my trip to Japan"
+}
+```
+
+Success: `201 Created`
+
+```json
+{
+  "data": {
+    "conversation": {
+      "id": "01JZ9M0R6V8X3K4P5Q7S9T2W6A",
+      "title": "Japan Trip",
+      "is_pinned": false,
+      "pinned_at": null,
+      "created_at": "2026-11-13T10:14:00+00:00",
+      "updated_at": "2026-11-13T10:14:05+00:00"
+    },
+    "user_message": {
+      "id": "01JZ9M0R6V8X3K4P5Q7S9T2W6B",
+      "role": "user",
+      "content": "Plan my trip to Japan",
+      "status": "complete",
+      "created_at": "2026-11-13T10:14:00+00:00",
+      "updated_at": "2026-11-13T10:14:00+00:00"
+    },
+    "assistant_message": {
+      "id": "01JZ9M0R6V8X3K4P5Q7S9T2W6C",
+      "role": "assistant",
+      "content": "Visit Kyoto in spring.",
+      "status": "complete",
+      "created_at": "2026-11-13T10:14:05+00:00",
+      "updated_at": "2026-11-13T10:14:05+00:00"
+    }
+  },
+  "message": "تم إنشاء المحادثة وإرسال الرسالة بنجاح."
+}
+```
+
+Errors: `401 unauthenticated`, `422 validation_failed`, `429 rate_limited`, `500 server_error`, `502 provider_failed`.
 
 ### Get conversation
 
@@ -784,7 +840,7 @@ Message fields:
 
 All message endpoints require authentication and ownership of the parent conversation. Nested message routes are scoped to the parent conversation; a message ID belonging to another conversation returns `404 not_found`.
 
-Message operations share a per-conversation operation lock. While another send, continuation, edit, regeneration, or deletion is running on the same conversation, the API returns `409 conversation_busy`.
+Message operations share a per-conversation operation lock. While another send, edit, regeneration, or deletion is running on the same conversation, the API returns `409 conversation_busy`.
 
 ### List messages
 
@@ -854,21 +910,19 @@ Errors: `401 unauthenticated`, `403 forbidden`, `404 not_found`, `422 validation
 
 `POST /api/v1/conversations/{conversation}/messages` (authenticated, owner)
 
-Persists a complete user message and generates a complete assistant reply. If the conversation title is blank, the first user message titles it using the first 60 characters of the message. If the AI provider fails, the user message remains persisted, no assistant message is created, and the API returns `502 provider_failed`.
+Persists a complete user message and generates a complete assistant reply. This request is synchronous and returns after generation completes. API message sends do not automatically title the conversation. If the AI provider fails, the user message remains persisted, no assistant message is created, and the API returns `502 provider_failed`.
 
 Request body:
 
 | Field | Type | Required | Rules |
 |---|---|---:|---|
 | `content` | string | yes | 1-10,000 characters. |
-| `persona_id` | string (ULID) | no | Nullable. Must be a visible persona for the authenticated user. Inactive or foreign custom personas are rejected. |
 
 Example request:
 
 ```json
 {
-  "content": "Hello there",
-  "persona_id": "01JZ9M0R6V8X3K4P5Q7S9T2W6D"
+  "content": "Hello there"
 }
 ```
 
@@ -900,45 +954,13 @@ Success: `201 Created`
 
 Errors: `401 unauthenticated`, `403 forbidden`, `404 not_found`, `409 conversation_busy`, `422 validation_failed`, `429 rate_limited`, `500 server_error`, `502 provider_failed`.
 
-### Continue conversation
-
-`POST /api/v1/conversations/{conversation}/messages/continue` (authenticated, owner)
-
-Generates a new assistant reply from completed message history without adding a new user message. The request body is optional.
-
-Continuation is rejected with `422 validation_failed` when there are no completed messages or when the latest message is still `pending`.
-
-Request body:
-
-| Field | Type | Required | Rules |
-|---|---|---:|---|
-| `persona_id` | string (ULID) | no | Nullable. Must be a visible persona for the authenticated user. |
-
-Success: `200 OK`
-
-```json
-{
-  "data": {
-    "id": "01JZ9M0R6V8X3K4P5Q7S9T2W6C",
-    "role": "assistant",
-    "content": "Continued answer",
-    "status": "complete",
-    "created_at": "2026-11-13T10:15:00+00:00",
-    "updated_at": "2026-11-13T10:15:00+00:00"
-  },
-  "message": "تم متابعة المحادثة بنجاح."
-}
-```
-
-Errors: `401 unauthenticated`, `403 forbidden`, `404 not_found`, `409 conversation_busy`, `422 validation_failed`, `429 rate_limited`, `500 server_error`, `502 provider_failed`.
-
 ### Edit message
 
 `PATCH /api/v1/conversations/{conversation}/messages/{message}` or `PUT /api/v1/conversations/{conversation}/messages/{message}` (authenticated, owner)
 
-Edits a user message and regenerates its immediate assistant reply. If the edited user message is the latest message and has no assistant reply, an assistant message is created. Later messages are preserved.
+Edits a user message and regenerates its immediate assistant reply. On success, all messages after that assistant reply are deleted, matching the Web chat's branch behavior. If the edited user message is the latest message and has no assistant reply, a new assistant message is created.
 
-Only `user` messages can be edited. Editing an assistant message returns `403 forbidden`. If the message immediately following the target is not an assistant message, the edit is rejected with `422 validation_failed`. If the AI provider fails, the user edit and assistant replacement are rolled back.
+Only `user` messages can be edited. Editing an assistant message returns `403 forbidden`. If the message immediately following the target is not an assistant message, the edit is rejected with `422 validation_failed`. If the AI provider fails, the user edit, assistant replacement, and later messages remain unchanged.
 
 Path parameters:
 
@@ -952,7 +974,6 @@ Request body:
 | Field | Type | Required | Rules |
 |---|---|---:|---|
 | `content` | string | yes | 1-10,000 characters. |
-| `persona_id` | string (ULID) | no | Nullable. Must be a visible persona for the authenticated user. |
 
 Example request:
 
@@ -996,8 +1017,8 @@ Errors: `401 unauthenticated`, `403 forbidden`, `404 not_found`, `409 conversati
 
 Regenerates an assistant response. The target message may be either:
 
-- An `assistant` message: the message is replaced in place using completed history before it. At least one completed user message must exist in that history.
-- A completed `user` message: the assistant reply immediately following it is replaced, or a new assistant reply is created when the user message is the latest message. The next message, when present, must be an assistant message.
+- An `assistant` message: the message is replaced in place using completed history before it. At least one completed user message must exist in that history. On success, every message after the replaced assistant message is deleted.
+- A completed `user` message: the assistant reply immediately following it is replaced, or a new assistant reply is created when the user message is the latest message. The next message, when present, must be an assistant message. On success, messages after the replaced assistant reply are deleted.
 
 A user target must have `status = complete`. A `system` message cannot be regenerated. Provider failure leaves every message unchanged.
 
@@ -1008,11 +1029,7 @@ Path parameters:
 | `conversation` | string (ULID) | Conversation identifier. |
 | `message` | string (ULID) | Message identifier within the conversation. |
 
-Request body:
-
-| Field | Type | Required | Rules |
-|---|---|---:|---|
-| `persona_id` | string (ULID) | no | Nullable. Must be a visible persona for the authenticated user. |
+No request body is required. The currently active custom persona is selected automatically; if none is active, the system default persona is used.
 
 Success: `200 OK`
 
@@ -1051,6 +1068,7 @@ Behavior:
 - The system default persona is provisioned automatically and is always active.
 - The system default persona is visible to every authenticated user but cannot be updated, deleted, activated, or deactivated.
 - Custom personas are visible only to their owner.
+- Only one custom persona can be active per user. Creating or activating a custom persona, or updating it to active, automatically deactivates the user's other custom personas.
 - Custom persona creation is limited by `config('ai.personas.max_custom')`, which defaults to 3.
 - An authenticated user may create personas (`create` policy always allows it); update, delete, activate, and deactivate require ownership and a non-system persona.
 
@@ -1276,11 +1294,9 @@ Errors: `401 unauthenticated`, `403 forbidden`, `404 not_found`, `429 rate_limit
 
 ### Persona selection for messages
 
-Message send, edit, continuation, and regeneration accept an optional `persona_id`:
+Message send, edit, and regeneration do not accept a `persona_id`. The API automatically uses the authenticated user's active custom persona; if none is active, it uses the system default persona.
 
-- When `persona_id` is supplied, that persona must be a valid ULID, visible to the authenticated user, and active for custom personas.
-- When `persona_id` is omitted or `null`, the most recently updated active custom persona is used, falling back to the system default persona.
-- An invalid, inactive, or foreign persona returns `422 validation_failed` on `persona_id` before any AI request is created.
+Only one custom persona can be active for a user. Creating a persona as active, activating it, or updating it to active automatically deactivates the user's other custom personas. The system default remains active as the fallback and is not counted among custom personas.
 
 ## Authorization and ownership
 

@@ -12,6 +12,7 @@ class AiException extends RuntimeException
         public readonly ?string $providerCode = null,
         public readonly ?string $providerMessage = null,
         ?Throwable $previous = null,
+        public readonly bool $connectionFailure = false,
     ) {
         parent::__construct($message, 0, $previous);
     }
@@ -61,7 +62,11 @@ class AiException extends RuntimeException
 
     public static function connectionFailed(string $connection, ?Throwable $previous = null): self
     {
-        return new self("AI connection [{$connection}] could not reach the provider.", previous: $previous);
+        return new self(
+            "AI connection [{$connection}] could not reach the provider.",
+            previous: $previous,
+            connectionFailure: true,
+        );
     }
 
     public static function providerError(

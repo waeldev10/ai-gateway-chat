@@ -9,6 +9,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
+/** يحذف محادثات المستخدم المحددة بعد التحقق من ملكيتها وتنسيق أقفال العمليات. */
 class ConversationBulkService
 {
     public function __construct(

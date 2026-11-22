@@ -143,7 +143,6 @@ it('deletes the conversation and redirects to the landing page', function () {
     ])
         ->call('delete')
         ->assertDispatched('close-confirm-modal', id: 'page-delete')
-        ->assertDispatched('conversations-changed')
         ->assertRedirect(route('conversations.create'));
 
     expect(Conversation::find($conversation->id))->toBeNull()
@@ -190,8 +189,27 @@ it('deletes the active conversation from the sidebar and redirects', function ()
     ])
         ->call('delete', (string) $conversation->id)
         ->assertDispatched('close-confirm-modal', id: 'sidebar-delete')
-        ->assertDispatched('conversations-changed')
         ->assertRedirect(route('conversations.create'));
+
+    expect(Conversation::find($conversation->id))->toBeNull();
+});
+
+it('redirects after deleting an active sidebar conversation when its mounted active id is stale', function () {
+    $user = User::factory()->create();
+    $conversation = Conversation::factory()->for($user)->create();
+
+    $this->actingAs($user);
+
+    $component = Livewire::test(ConversationActions::class, [
+        'context' => 'sidebar',
+        'activeId' => null,
+    ]);
+
+    $component->call('delete', (string) $conversation->id, true)
+        ->assertDispatched('close-confirm-modal', id: 'sidebar-delete')
+        ->assertRedirect(route('conversations.create'));
+
+    expect($component->effects)->not->toHaveKey('redirectUsingNavigate');
 
     expect(Conversation::find($conversation->id))->toBeNull();
 });

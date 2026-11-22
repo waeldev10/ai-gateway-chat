@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
+/** يضيف تعليمات الشخصية للسياق، ويرسل الطلب إلى AiService، ثم يسجل حالته ويحفظ الرد أو أجزاء البث. */
 class MessageGenerationService
 {
     public function __construct(
@@ -137,11 +138,13 @@ class MessageGenerationService
         AiSource $source = AiSource::Api,
         ?Message $replace = null,
         ?AiPersona $persona = null,
+        ?Closure $beforePersist = null,
     ): Message {
         return $this->persist(
             $this->attempt($conversation, $messages, $source, $persona),
             $conversation,
             $replace,
+            $beforePersist,
         );
     }
 
@@ -151,7 +154,7 @@ class MessageGenerationService
      * Failures are reported through the returned array instead of being thrown
      * once streaming has started, because response headers may already be sent.
      *
-     * @return Generator<int, string, mixed, array{assistant_message: ?Message, failed: bool}>
+     * @return Generator<int, string, mixed, array{assistant_message: ?Message, failed: bool, connection_failed: bool}>
      */
     public function stream(
         Conversation $conversation,
@@ -220,7 +223,11 @@ class MessageGenerationService
                 $beforePersist,
             );
 
-            return ['assistant_message' => $message, 'failed' => false];
+            return [
+                'assistant_message' => $message,
+                'failed' => false,
+                'connection_failed' => false,
+            ];
         } catch (Throwable $exception) {
             $message = $content === ''
                 ? null
@@ -230,7 +237,11 @@ class MessageGenerationService
                 $this->markAiRequestAsFailed($aiRequest, $startedAt, $exception);
             }
 
-            return ['assistant_message' => $message, 'failed' => true];
+            return [
+                'assistant_message' => $message,
+                'failed' => true,
+                'connection_failed' => $exception instanceof AiException && $exception->connectionFailure,
+            ];
         }
     }
 

@@ -1,6 +1,6 @@
 @props(['name'])
 
-<div class="flex w-full items-start gap-3" dir="auto">
+<div class="flex w-full items-start gap-3" dir="rtl">
     <div class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-primary" aria-hidden="true">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z" />

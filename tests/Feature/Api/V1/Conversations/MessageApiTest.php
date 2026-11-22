@@ -14,6 +14,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Mockery\MockInterface;
@@ -34,6 +35,84 @@ beforeEach(function () {
 });
 
 describe('sending messages', function () {
+    it('creates a conversation and generates its first exchange in one request', function () {
+        $user = User::factory()->create();
+
+        $this->mock(AiService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('generate')
+                ->once()
+                ->with(Mockery::on(fn (AiRequestData $request): bool => $request->messages === withDefaultSystemPrompt([
+                    ['role' => 'user', 'content' => 'Plan my trip to Japan'],
+                ])))
+                ->andReturn(new AiResponse('Visit Kyoto in spring.', 'openai', 'gpt-test'));
+
+            $mock->shouldReceive('generate')
+                ->once()
+                ->with(Mockery::on(fn (AiRequestData $request): bool => str_contains($request->messages[0]['content'], 'Plan my trip to Japan')))
+                ->andReturn(new AiResponse('Japan Trip', 'openai', 'gpt-test'));
+        });
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/conversations/start', ['content' => 'Plan my trip to Japan'])
+            ->assertCreated()
+            ->assertJsonPath('data.conversation.title', 'Japan Trip')
+            ->assertJsonPath('data.user_message.content', 'Plan my trip to Japan')
+            ->assertJsonPath('data.assistant_message.content', 'Visit Kyoto in spring.')
+            ->assertJsonPath('message', 'تم إنشاء المحادثة وإرسال الرسالة بنجاح.');
+
+        $conversation = Conversation::query()->findOrFail($response->json('data.conversation.id'));
+        $requests = AiRequestRecord::query()->where('conversation_id', $conversation->id)->orderBy('id')->get();
+
+        expect($conversation->messages()->count())->toBe(2)
+            ->and($requests)->toHaveCount(2)
+            ->and($requests->every(fn (AiRequestRecord $request): bool => $request->source === AiSource::Api))->toBeTrue();
+    });
+
+    it('keeps the new conversation and user message if its first generation fails', function () {
+        $user = User::factory()->create();
+
+        $this->mock(AiService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('generate')
+                ->once()
+                ->andThrow(AiException::providerError('openai'));
+        });
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/conversations/start', ['content' => 'Save this first question'])
+            ->assertStatus(502)
+            ->assertJsonPath('code', 'provider_failed');
+
+        $conversation = Conversation::query()->where('user_id', $user->id)->sole();
+
+        expect($conversation->title)->toBeNull()
+            ->and($conversation->messages()->count())->toBe(1)
+            ->and($conversation->messages()->sole()->content)->toBe('Save this first question');
+    });
+
+    it('uses the first user message as title if title generation fails', function () {
+        $user = User::factory()->create();
+
+        $this->mock(AiService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('generate')
+                ->once()
+                ->andReturn(new AiResponse('A helpful reply.', 'openai', 'gpt-test'));
+
+            $mock->shouldReceive('generate')
+                ->once()
+                ->andThrow(AiException::providerError('openai'));
+        });
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/conversations/start', ['content' => '  Plan my trip   to Japan  '])
+            ->assertCreated()
+            ->assertJsonPath('data.conversation.title', 'Plan my trip to Japan');
+
+        $conversation = Conversation::query()->findOrFail($response->json('data.conversation.id'));
+
+        expect($conversation->messages()->count())->toBe(2)
+            ->and(AiRequestRecord::query()->where('conversation_id', $conversation->id)->count())->toBe(2);
+    });
+
     it('persists the user message and the assistant reply', function () {
         $user = User::factory()->create();
         $conversation = Conversation::factory()->for($user)->create(['title' => 'Existing title']);
@@ -180,6 +259,28 @@ describe('sending messages', function () {
         expect($aiRequest->status)->toBe(AiRequestStatus::Failed)
             ->and($aiRequest->message_id)->toBeNull()
             ->and($aiRequest->error_message)->not->toBeNull();
+    });
+
+    it('returns a safe connection error code when the ai provider is unreachable', function () {
+        $user = User::factory()->create();
+        $conversation = Conversation::factory()->for($user)->create();
+
+        $this->mock(AiService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('generate')
+                ->once()
+                ->andThrow(AiException::connectionFailed(
+                    'openai',
+                    new ConnectionException('Provider is unreachable.'),
+                ));
+        });
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/v1/conversations/{$conversation->id}/messages", ['content' => 'Hello'])
+            ->assertStatus(502)
+            ->assertJsonPath('detail', 'تعذر الحصول على رد من مزود الذكاء الاصطناعي. يرجى المحاولة لاحقًا.')
+            ->assertJsonPath('code', 'provider_connection_failed')
+            ->assertJsonMissingPath('exception')
+            ->assertJsonMissingPath('previous');
     });
 });
 

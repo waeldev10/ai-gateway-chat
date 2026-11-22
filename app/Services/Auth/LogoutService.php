@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\PersonalAccessToken;
 
+/** ينهي جلسة الويب الحالية أو يحذف رمز Sanctum الحالي للمستخدم. */
 class LogoutService
 {
     public function logout(User $user): void

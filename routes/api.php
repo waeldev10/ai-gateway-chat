@@ -41,7 +41,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
             Route::controller(ConversationController::class)->group(function (): void {
                 Route::get('/', 'index')->name('index');
-                Route::get('search', 'index')->name('search');
+                Route::post('start', 'start')->middleware('throttle:api-ai')->name('start');
                 Route::post('/', 'store')->name('store');
                 Route::delete('/', 'destroyMany')->name('destroy-many');
                 Route::get('{conversation}/messages', 'messages')->name('messages');
@@ -54,7 +54,6 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
             Route::controller(MessageController::class)->group(function (): void {
                 Route::post('{conversation}/messages', 'store')->middleware('throttle:api-ai')->name('messages.store');
-                Route::post('{conversation}/messages/continue', 'continueConversation')->middleware('throttle:api-ai')->name('messages.continue');
                 Route::post('{conversation}/messages/{message}/regenerate', 'regenerate')
                     ->middleware('throttle:api-ai')
                     ->scopeBindings()

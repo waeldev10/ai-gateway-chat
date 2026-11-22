@@ -8,6 +8,7 @@ use Closure;
 use Generator;
 use Illuminate\Support\Facades\Cache;
 
+/** ينسق العمليات المتزامنة على المحادثة بقفل مخزن مؤقت وقفل صف قاعدة البيانات، ويمتد قفله طوال استهلاك البث. */
 final class ConversationOperationLock
 {
     public function run(Conversation $conversation, Closure $callback): mixed

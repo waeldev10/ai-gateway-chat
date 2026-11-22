@@ -2,19 +2,24 @@
 
 namespace App\Http\Controllers\Api\V1\Conversations;
 
+use App\Enums\AiSource;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Conversations\BulkDeleteConversationsRequest;
 use App\Http\Requests\Api\V1\Conversations\ListConversationsRequest;
 use App\Http\Requests\Api\V1\Conversations\ListMessagesRequest;
+use App\Http\Requests\Api\V1\Conversations\SendMessageRequest;
 use App\Http\Requests\Api\V1\Conversations\StoreConversationRequest;
 use App\Http\Requests\Api\V1\Conversations\UpdateConversationRequest;
 use App\Http\Resources\Api\V1\Conversations\ConversationResource;
 use App\Http\Resources\Api\V1\Conversations\MessageCollection;
+use App\Http\Resources\Api\V1\Conversations\MessageExchangeResource;
 use App\Models\Conversation;
 use App\Services\Conversation\ConversationBulkService;
 use App\Services\Conversation\ConversationMessageService;
 use App\Services\Conversation\ConversationSearchService;
 use App\Services\Conversation\ConversationService;
+use App\Services\Conversation\ConversationTitleService;
+use App\Services\Message\MessageService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
@@ -25,6 +30,8 @@ class ConversationController extends Controller
         private readonly ConversationSearchService $conversationSearchService,
         private readonly ConversationBulkService $conversationBulkService,
         private readonly ConversationMessageService $conversationMessageService,
+        private readonly MessageService $messageService,
+        private readonly ConversationTitleService $titles,
     ) {}
 
     public function index(ListConversationsRequest $request): JsonResponse
@@ -50,6 +57,33 @@ class ConversationController extends Controller
         return response()->json([
             'data' => (new ConversationResource($conversation))->resolve($request),
             'message' => 'تم إنشاء المحادثة بنجاح.',
+        ], 201);
+    }
+
+    public function start(SendMessageRequest $request): JsonResponse
+    {
+        $conversation = $this->conversationService->create($request->user(), []);
+        $this->authorize('sendMessage', $conversation);
+
+        $content = $request->validated('content');
+        $exchange = $this->messageService->send($conversation, $content, AiSource::Api);
+
+        $this->titles->maybeGenerate(
+            $conversation,
+            $content,
+            $exchange['assistant_message']->content,
+            AiSource::Api,
+        );
+
+        $exchangeData = (new MessageExchangeResource($exchange))->resolve($request);
+
+        return response()->json([
+            'data' => [
+                'conversation' => (new ConversationResource($conversation))->resolve($request),
+                'user_message' => $exchangeData['user_message'],
+                'assistant_message' => $exchangeData['assistant_message'],
+            ],
+            'message' => 'تم إنشاء المحادثة وإرسال الرسالة بنجاح.',
         ], 201);
     }
 

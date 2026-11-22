@@ -2,6 +2,7 @@
 
 namespace App\AI\DTOs;
 
+/** يوحّد أعداد رموز الإدخال والإخراج والإجمالي الواردة من مزودي الخدمة. */
 final readonly class AiUsage
 {
     public function __construct(

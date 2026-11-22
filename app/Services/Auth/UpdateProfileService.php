@@ -4,6 +4,7 @@ namespace App\Services\Auth;
 
 use App\Models\User;
 
+/** يحدّث بيانات الملف الشخصي، ويلغي توثيق البريد إذا تغيّر عنوانه. */
 class UpdateProfileService
 {
     public function update(User $user, array $data): User

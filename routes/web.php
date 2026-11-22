@@ -35,7 +35,7 @@ Route::middleware('auth')->group(function () {
     Route::get('conversations/create', [ConversationController::class, 'create'])
         ->name('conversations.create');
 
-    Route::get('conversations/search', [ConversationController::class, 'search'])
+    Route::get('conversations', [ConversationController::class, 'search'])
         ->name('conversations.search');
 
     Route::get('conversations/{conversation}', [ConversationController::class, 'show'])

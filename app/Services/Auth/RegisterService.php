@@ -5,6 +5,7 @@ namespace App\Services\Auth;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 
+/** ينشئ حسابًا من البيانات المعتمدة، ويمكنه تسجيل المستخدم مباشرة في جلسة الويب. */
 class RegisterService
 {
     public function register(array $data): User

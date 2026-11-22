@@ -10,6 +10,7 @@ use App\Exceptions\AiException;
 use Generator;
 use Psr\Http\Message\StreamInterface;
 
+/** يطابق الطلبات والردود مع Gemini Interactions API ويعيد النتائج أو أجزاء البث بصيغة التطبيق الموحدة. */
 final class GeminiInteractionsDriver extends HttpDriver
 {
     public function generate(AiRequest $request): AiResponse

@@ -2,17 +2,21 @@
     class="relative isolate flex min-h-0 flex-1 flex-col"
     data-conversation-chat
     data-conversation-id="{{ $conversationId ?? '' }}"
-    data-chat-active="{{ $messages->isNotEmpty() ? 'true' : 'false' }}"
+    data-chat-active="{{ $hasMessages ? 'true' : 'false' }}"
     x-data="{
         stick: true,
         scrolling: false,
         sending: false,
         generationActive: false,
+        isOffline: ! navigator.onLine,
+        providerUnavailable: false,
+        loadingOlderMessages: false,
         showScrollToBottom: false,
-        hasMessages: {{ $messages->isNotEmpty() ? 'true' : 'false' }},
-        pendingText: '',
+        hasMessages: {{ $hasMessages ? 'true' : 'false' }},
+        initialSendPending: {{ $shouldSendInitialMessage ? 'true' : 'false' }},
+        pendingText: @js($initialSendContent ?? ''),
         get isActive() {
-            return this.hasMessages || this.sending || this.generationActive;
+            return this.hasMessages;
         },
         scrollToBottom() {
             const scroll = this.$refs.scroll;
@@ -84,6 +88,61 @@
             el.style.height = '';
             el.style.overflowY = 'hidden';
         },
+        async loadOlderMessages() {
+            const scroll = this.$refs.scroll;
+
+            if (this.loadingOlderMessages || ! scroll) {
+                return;
+            }
+
+            const previousHeight = scroll.scrollHeight;
+            const previousTop = scroll.scrollTop;
+            this.loadingOlderMessages = true;
+
+            try {
+                await this.$wire.loadOlderMessages();
+
+                this.$nextTick(() => {
+                    scroll.scrollTop = previousTop + scroll.scrollHeight - previousHeight;
+                });
+            } finally {
+                this.$nextTick(() => {
+                    this.loadingOlderMessages = false;
+                });
+            }
+        },
+        async startInitialMessage() {
+            if (! this.initialSendPending || this.sending || this.isOffline) {
+                return;
+            }
+
+            this.initialSendPending = false;
+            this.sending = true;
+
+            try {
+                await this.$wire.sendInitialMessage();
+            } catch (error) {
+                if (! navigator.onLine) {
+                    this.isOffline = true;
+                    return;
+                }
+
+                window.dispatchEvent(new CustomEvent('toast', {
+                    detail: {
+                        type: 'error',
+                        title: 'تعذر الإرسال',
+                        message: 'حاول مرة أخرى.',
+                    },
+                }));
+            } finally {
+                this.sending = false;
+
+                if (! this.$refs.content?.querySelector('[data-message]')) {
+                    this.hasMessages = false;
+                    this.pendingText = '';
+                }
+            }
+        },
         handleConversationUpdated() {
             this.pendingText = '';
 
@@ -101,7 +160,7 @@
             });
         },
         async submitChat() {
-            if (this.sending || this.generationActive) {
+            if (this.isOffline || this.sending || this.generationActive) {
                 return;
             }
 
@@ -113,6 +172,9 @@
             }
 
             this.pendingText = text;
+            const hadMessages = this.hasMessages;
+            const previousConversationId = this.$wire.conversationId;
+            this.hasMessages = true;
             this.sending = true;
 
             if (composer) {
@@ -127,6 +189,11 @@
             try {
                 await this.$wire.send();
             } catch (error) {
+                if (! navigator.onLine) {
+                    this.isOffline = true;
+                    return;
+                }
+
                 window.dispatchEvent(new CustomEvent('toast', {
                     detail: {
                         type: 'error',
@@ -135,6 +202,13 @@
                     },
                 }));
             } finally {
+                if (! hadMessages) {
+                    const hasPersistedMessages = Boolean(this.$refs.content?.querySelector('[data-message]'));
+                    const createdConversation = previousConversationId === null && this.$wire.conversationId !== null;
+
+                    this.hasMessages = hasPersistedMessages || createdConversation;
+                }
+
                 this.sending = false;
 
                 this.$nextTick(() => {
@@ -148,7 +222,11 @@
             }
         },
     }"
-    x-init="$nextTick(() => initChatScroll())"
+    x-init="$nextTick(() => { initChatScroll(); if (initialSendPending) startInitialMessage(); })"
+    @offline.window="isOffline = true; providerUnavailable = false"
+    @online.window="isOffline = false; providerUnavailable = false; if (initialSendPending) $nextTick(() => startInitialMessage())"
+    @ai-provider-connection-failed.window="providerUnavailable = true"
+    @ai-provider-connection-restored.window="providerUnavailable = false"
     @conversation-chat-updated.window="handleConversationUpdated()"
     @generation-started.window="generationActive = true"
     @generation-ended.window="generationActive = false"
@@ -169,6 +247,18 @@
             :class="{ 'chat-messages-with-composer': isActive }"
         >
             <div class="space-y-4" role="log" aria-live="polite" aria-relevant="additions">
+                @if ($hasOlderMessages)
+                    <div
+                        wire:key="older-messages-{{ $olderMessagesId }}"
+                        data-older-messages-sentinel
+                        x-intersect="loadOlderMessages()"
+                        class="flex min-h-8 justify-center py-2 text-xs text-muted-foreground"
+                        aria-live="polite"
+                    >
+                        <span x-show="loadingOlderMessages" x-cloak>جارٍ تحميل الرسائل السابقة...</span>
+                    </div>
+                @endif
+
                 @foreach ($messages as $message)
                     <x-chat.message
                         :message="$message"
@@ -183,7 +273,7 @@
                     dir="ltr"
                     wire:loading.class.remove="hidden"
                     wire:loading.flex
-                    wire:target="send"
+                    wire:target="send,sendInitialMessage"
                     x-show="pendingText !== ''"
                 >
                     <div class="chat-user-message-container flex flex-col items-end gap-1" dir="auto">
@@ -200,7 +290,7 @@
                     class="hidden w-full"
                     wire:loading.class.remove="hidden"
                     wire:loading.flex
-                    wire:target="send"
+                    wire:target="send,sendInitialMessage"
                     aria-live="polite"
                     aria-busy="true"
                 >
@@ -250,6 +340,37 @@
         </button>
 
         <p data-empty-prompt class="mb-5 text-center text-lg font-medium text-foreground/80">كيف يمكنني مساعدتك؟</p>
+        {{-- يرصد التنبيه أحداث اتصال المتصفح ونتائج عمليات المحادثة دون إرسال فحوص دورية.
+             يظهر داخل صفحة المحادثة فقط لإبقاء بقية التطبيق قابلة للاستخدام. --}}
+        <div
+            x-show="isOffline || providerUnavailable"
+            x-cloak
+            data-chat-offline-notice
+            role="status"
+            aria-live="polite"
+            class="mb-4 flex items-center gap-3 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-foreground"
+        >
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-destructive/15 bg-destructive/10 text-destructive" aria-hidden="true">
+                <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2 8.8a15 15 0 0 1 20 0" />
+                    <path d="M5 12a10 10 0 0 1 6.8-2.6" />
+                    <path d="M8.5 15.2a5 5 0 0 1 2.3-1.2" />
+                    <path d="M2 2l20 20" />
+                </svg>
+            </span>
+            <span class="min-w-0 flex-1">
+                <span
+                    x-text="providerUnavailable && ! isOffline ? 'تعذر الاتصال بمزود الذكاء الاصطناعي' : 'لا يتوفر اتصال بالإنترنت'"
+                    class="block text-sm font-semibold text-foreground"
+                ></span>
+                <span
+                    x-text="providerUnavailable && ! isOffline
+                        ? 'تم حفظ رسالتك. انتظر عودة الاتصال قبل إرسال رسالة أخرى.'
+                        : 'لن تُرسل الرسالة الآن. أعد الاتصال لإرسالها.'"
+                    class="mt-0.5 block text-xs leading-5 text-muted-foreground"
+                ></span>
+            </span>
+        </div>
         <div class="chat-composer-surface flex items-end gap-1.5 rounded-[1.75rem] border border-input/80 bg-surface p-1.5 transition focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/15">
             <textarea
                 x-ref="composer"
@@ -263,7 +384,7 @@
                 class="block max-h-40 min-h-11 w-full resize-none border-0 bg-transparent px-3 py-2.5 text-sm leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-60"
                 :disabled="sending || generationActive"
                 wire:loading.attr="disabled"
-                wire:target="send"
+                wire:target="send,sendInitialMessage"
                 @input="resizeComposer()"
                 @keydown.enter="if (!$event.shiftKey && !$event.isComposing) { $event.preventDefault(); submitChat(); }"
             ></textarea>
@@ -272,16 +393,16 @@
                 type="submit"
                 aria-label="إرسال الرسالة"
                 class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-2xl ui-primary-btn px-3.5 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
-                :disabled="($wire.draft || '').trim() === '' || sending || generationActive"
+                :disabled="($wire.draft || '').trim() === '' || isOffline || sending || generationActive"
                 wire:loading.attr="disabled"
-                wire:target="send"
+                wire:target="send,sendInitialMessage"
             >
                 <span class="sr-only">إرسال</span>
-                <svg wire:loading.remove wire:target="send" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg wire:loading.remove wire:target="send,sendInitialMessage" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="m22 2-7 20-4-9-9-4Z" />
                     <path d="M22 2 11 13" />
                 </svg>
-                <svg wire:loading wire:target="send" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg wire:loading wire:target="send,sendInitialMessage" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M21 12a9 9 0 1 1-6.22-8.56" />
                 </svg>
             </button>

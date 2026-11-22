@@ -33,7 +33,7 @@ beforeEach(function () {
 });
 
 describe('regenerating assistant replies', function () {
-    it('replaces an assistant message in place and preserves later messages', function () {
+    it('replaces an assistant message in place and removes later messages', function () {
         $user = User::factory()->create();
         $conversation = Conversation::factory()->for($user)->create();
 
@@ -86,11 +86,10 @@ describe('regenerating assistant replies', function () {
             ->assertJsonPath('data.status', 'complete')
             ->assertJsonPath('message', 'تم إعادة توليد الرد بنجاح.');
 
-        expect($conversation->messages()->count())->toBe(5)
+        expect($conversation->messages()->count())->toBe(3)
             ->and($target->refresh()->content)->toBe('Fresh answer')
-            ->and($laterUser->refresh()->content)->toBe('Later question')
-            ->and($laterAssistant->refresh()->content)->toBe('Later answer')
-            ->and($laterAssistant->refresh()->status)->toBe(MessageStatus::Complete);
+            ->and($conversation->messages()->whereKey($laterUser->id)->exists())->toBeFalse()
+            ->and($conversation->messages()->whereKey($laterAssistant->id)->exists())->toBeFalse();
 
         $aiRequest = AiRequestRecord::query()->sole();
 
@@ -114,6 +113,18 @@ describe('regenerating assistant replies', function () {
             'status' => MessageStatus::Complete,
             'created_at' => now()->subMinute(),
         ]);
+        $laterUser = Message::factory()->for($conversation)->create([
+            'role' => MessageRole::User,
+            'content' => 'Later question',
+            'status' => MessageStatus::Complete,
+            'created_at' => now(),
+        ]);
+        $laterAssistant = Message::factory()->for($conversation)->create([
+            'role' => MessageRole::Assistant,
+            'content' => 'Later answer',
+            'status' => MessageStatus::Complete,
+            'created_at' => now()->addSecond(),
+        ]);
 
         $this->mock(AiService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('generate')
@@ -132,7 +143,9 @@ describe('regenerating assistant replies', function () {
 
         expect($conversation->messages()->count())->toBe(2)
             ->and($userMessage->refresh()->content)->toBe('Question')
-            ->and($assistant->refresh()->content)->toBe('New answer');
+            ->and($assistant->refresh()->content)->toBe('New answer')
+            ->and($conversation->messages()->whereKey($laterUser->id)->exists())->toBeFalse()
+            ->and($conversation->messages()->whereKey($laterAssistant->id)->exists())->toBeFalse();
     });
 
     it('creates an assistant when regenerating the latest user message', function () {

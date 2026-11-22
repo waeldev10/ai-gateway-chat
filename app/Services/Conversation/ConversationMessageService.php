@@ -5,6 +5,7 @@ namespace App\Services\Conversation;
 use App\Models\Conversation;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 
+/** يجلب رسائل المحادثة بصفحات مؤشر، بدءًا من الأحدث لدعم التحميل التدريجي. */
 class ConversationMessageService
 {
     public function paginate(

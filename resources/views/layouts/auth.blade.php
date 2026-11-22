@@ -8,7 +8,6 @@
     @include('components.theme.theme-init')
     @include('components.theme.ui-colors')
     @if(file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-    @fonts
     @vite(['resources/css/app.css', 'resources/js/app.js']) @endif
     @livewireStyles
     @stack('css')

@@ -75,7 +75,7 @@
             <div
                 id="sidebar-conversations-scroll"
                 :class="sidebarOpen ? '' : 'lg:hidden'"
-                class="mt-1 flex-1 min-h-0 overflow-x-hidden overflow-y-auto ui-scroll-subtle"
+                class="mt-1 flex-1 min-h-0 overflow-x-hidden overflow-y-auto ui-scrollbar-hidden"
             >
                 @if (request()->header('X-Livewire-Navigate'))
                     <livewire:sidebar.sidebar-conversations :active-id="request()->route('conversation')?->id" />

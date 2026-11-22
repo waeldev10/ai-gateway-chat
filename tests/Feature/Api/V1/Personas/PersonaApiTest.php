@@ -70,6 +70,23 @@ describe('creating personas', function () {
             ->and($persona->is_default)->toBeFalse();
     });
 
+    it('deactivates the other custom personas when creating an active persona', function () {
+        $user = User::factory()->create();
+        $activePersona = AiPersona::factory()->for($user)->create(['is_active' => true]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/personas', [
+                'name' => 'New Active Persona',
+                'system_prompt' => 'Use the new instructions.',
+                'is_active' => true,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.is_active', true);
+
+        expect($activePersona->refresh()->is_active)->toBeFalse()
+            ->and($user->aiPersonas()->where('is_active', true)->sole()->id)->toBe($response->json('data.id'));
+    });
+
     it('enforces the custom persona limit', function () {
         config()->set('ai.personas.max_custom', 2);
 
@@ -120,6 +137,21 @@ describe('updating and deleting personas', function () {
 
         expect($persona->refresh()->name)->toBe('Updated Persona')
             ->and($persona->is_active)->toBeFalse();
+    });
+
+    it('deactivates other custom personas when an inactive persona is updated to active', function () {
+        $user = User::factory()->create();
+        $currentlyActive = AiPersona::factory()->for($user)->create(['is_active' => true]);
+        $toActivate = AiPersona::factory()->for($user)->inactive()->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson("/api/v1/personas/{$toActivate->id}", ['is_active' => true])
+            ->assertOk()
+            ->assertJsonPath('data.is_active', true);
+
+        expect($currentlyActive->refresh()->is_active)->toBeFalse()
+            ->and($toActivate->refresh()->is_active)->toBeTrue()
+            ->and($user->aiPersonas()->where('is_active', true)->count())->toBe(1);
     });
 
     it('forbids updating the system default', function () {
@@ -173,6 +205,7 @@ describe('updating and deleting personas', function () {
 describe('activating and deactivating personas', function () {
     it('activates and deactivates an owned persona', function () {
         $user = User::factory()->create();
+        $currentlyActive = AiPersona::factory()->for($user)->create(['is_active' => true]);
         $persona = AiPersona::factory()->for($user)->inactive()->create();
 
         $this->actingAs($user, 'sanctum')
@@ -180,6 +213,9 @@ describe('activating and deactivating personas', function () {
             ->assertOk()
             ->assertJsonPath('data.is_active', true)
             ->assertJsonPath('message', 'تم تفعيل الشخصية بنجاح.');
+
+        expect($currentlyActive->refresh()->is_active)->toBeFalse()
+            ->and($user->aiPersonas()->where('is_active', true)->count())->toBe(1);
 
         $this->actingAs($user, 'sanctum')
             ->postJson("/api/v1/personas/{$persona->id}/deactivate")

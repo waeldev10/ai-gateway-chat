@@ -8,25 +8,39 @@ use App\Enums\AiRequestStatus;
 use App\Enums\AiSource;
 use App\Models\AiRequest as AiRequestRecord;
 use App\Models\Conversation;
+use Illuminate\Support\Str;
 use Throwable;
 
+/** يطلب عنوانًا موجزًا من طبقة الذكاء الاصطناعي لأول تبادل، ثم يسجله على المحادثة. */
 class ConversationTitleService
 {
     public function __construct(private readonly AiService $aiService) {}
 
-    public function maybeGenerate(Conversation $conversation, string $userContent, string $assistantContent): void
-    {
+    public function maybeGenerate(
+        Conversation $conversation,
+        string $userContent,
+        string $assistantContent,
+        AiSource $source = AiSource::Web,
+    ): void {
         if (! blank($conversation->title)) {
             return;
         }
 
-        $title = $this->generateTitle($conversation, $userContent, $assistantContent);
+        $title = $this->generateTitle($conversation, $userContent, $assistantContent, $source);
+
+        if (blank($title)) {
+            $title = Str::limit(Str::squish($userContent), 80);
+        }
 
         $conversation->update(['title' => $title]);
     }
 
-    private function generateTitle(Conversation $conversation, string $userContent, string $assistantContent): string
-    {
+    private function generateTitle(
+        Conversation $conversation,
+        string $userContent,
+        string $assistantContent,
+        AiSource $source,
+    ): string {
         [$provider, $model] = $this->configuredConnection();
 
         $aiRequest = AiRequestRecord::query()->create([
@@ -35,7 +49,7 @@ class ConversationTitleService
             'provider' => $provider,
             'model' => $model,
             'status' => AiRequestStatus::Started,
-            'source' => AiSource::Web,
+            'source' => $source,
         ]);
 
         $startedAt = microtime(true);

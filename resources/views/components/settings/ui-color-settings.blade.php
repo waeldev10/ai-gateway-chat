@@ -136,6 +136,7 @@
                     <span class="w-8 h-8 rounded-full border border-border shrink-0" :style="'background-color: ' + draft.accent" aria-hidden="true"></span>
                     <span class="flex-1 min-w-0">
                         <span class="block text-xs font-medium">لون التمييز</span>
+                        <span class="block text-[11px] text-muted-foreground">للخلفيات الهادئة حول أيقونات الملف والشخصيات</span>
                         <span class="block text-[11px] text-muted-foreground" dir="ltr" x-text="draft.accent"></span>
                     </span>
                     <input type="color" x-model="draft.accent" @input="preview()" aria-label="لون التمييز"

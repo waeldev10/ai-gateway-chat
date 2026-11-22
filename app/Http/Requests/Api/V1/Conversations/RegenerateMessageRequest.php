@@ -13,8 +13,6 @@ class RegenerateMessageRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
-            'persona_id' => ['sometimes', 'nullable', 'ulid'],
-        ];
+        return [];
     }
 }

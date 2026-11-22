@@ -29,12 +29,7 @@
   font-display: swap;
 }
 
-/* Tajawal is loaded by the Laravel Vite font plugin (`@fonts` in the layouts). */
 @theme {
-    /* --font-sans: 'Tajawal', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
-    --font-heading: 'Tajawal', ui-sans-serif, system-ui, sans-serif;
-    --font-sans:'' */
     --font-sans: "Thmanyah Sans", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --font-heading: "Thmanyah Sans", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
 }
@@ -77,7 +72,7 @@
     --ui-muted-foreground: #475569;
     --ui-border: #E2E8F0;
     --ui-input: #CBD5E1;
-    --ui-ring: #3B8C7D;
+    --ui-ring: var(--ui-primary);
 
     --ui-primary: #0C5548;
     --ui-primary-foreground: #FFFFFF;
@@ -106,7 +101,7 @@
     --ui-muted-foreground: #94A3B8;
     --ui-border: #263244;
     --ui-input: #334155;
-    --ui-ring: #63B4A5;
+    --ui-ring: var(--ui-primary);
 
     --ui-primary: #63B4A5;
     --ui-primary-foreground: #06231D;
@@ -343,27 +338,37 @@ button:not(:disabled) {
     max-width: 100%;
 }
 
-/* Subtle scrollbars for containers that opt in (e.g. the sidebar list):
-   thin, rounded thumb on a transparent track, derived from the muted text
-   token so it stays neutral in both schemes. Layout/width/overflow behavior
-   is untouched — this only repaints the native scrollbar. */
-.ui-scroll-subtle {
+/* Keep native scrollbars quiet and consistent across pages and nested panels.
+   Theme tokens make the thumb follow light/dark mode and the chosen primary. */
+* {
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--ui-muted-foreground) 55%, transparent) transparent;
+    scrollbar-color: color-mix(in srgb, var(--ui-muted-foreground) 38%, transparent) transparent;
 }
-.ui-scroll-subtle::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
 }
-.ui-scroll-subtle::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track {
     background: transparent;
 }
-.ui-scroll-subtle::-webkit-scrollbar-thumb {
-    background: color-mix(in srgb, var(--ui-muted-foreground) 45%, transparent);
+*::-webkit-scrollbar-thumb {
+    min-height: 2rem;
+    border: 2px solid transparent;
     border-radius: 9999px;
+    background-color: color-mix(in srgb, var(--ui-muted-foreground) 38%, transparent);
+    background-clip: content-box;
 }
-.ui-scroll-subtle::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--ui-muted-foreground) 75%, transparent);
+*::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--ui-primary) 58%, transparent);
+}
+*::-webkit-scrollbar-corner {
+    background: transparent;
+}
+.ui-scrollbar-hidden {
+    scrollbar-width: none;
+}
+.ui-scrollbar-hidden::-webkit-scrollbar {
+    display: none;
 }
 
 /* Checkboxes follow the primary token via the native `accent-color`

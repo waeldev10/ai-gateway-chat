@@ -174,8 +174,6 @@ describe('deletion safety', function () {
                 'content' => 'Q',
             ]);
 
-        // The operation lock key/API must match ConversationOperationLock.
-        // This test currently verifies the busy-operation response.
         $lock = Cache::lock(
             ConversationOperationLock::key($conversation),
             30
@@ -185,9 +183,7 @@ describe('deletion safety', function () {
 
         try {
             $this->actingAs($user, 'sanctum')
-                ->postJson(
-                    "/api/v1/conversations/{$conversation->id}/messages/continue"
-                )
+                ->postJson("/api/v1/conversations/{$conversation->id}/messages", ['content' => 'Hello'])
                 ->assertStatus(409)
                 ->assertJsonPath('code', 'conversation_busy');
 

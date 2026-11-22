@@ -58,7 +58,7 @@ class ApiExceptionRenderer
                 502,
                 'AI Provider Error',
                 'تعذر الحصول على رد من مزود الذكاء الاصطناعي. يرجى المحاولة لاحقًا.',
-                'provider_failed',
+                $exception->connectionFailure ? 'provider_connection_failed' : 'provider_failed',
             ),
             $exception instanceof HttpExceptionInterface => $this->renderHttpException($exception),
             default => ApiResponse::problem(

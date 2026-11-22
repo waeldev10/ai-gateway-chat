@@ -13,6 +13,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
+/** يعيد بناء السياق من رسالة المستخدم المعدلة ويفوض استبدال رد المساعد أو بثه إلى خدمة التوليد. */
 class MessageEditingService
 {
     public function __construct(
@@ -101,7 +102,7 @@ class MessageEditingService
      * message content and, when branching, deletes everything after the
      * replaced assistant reply.
      *
-     * @return Generator<int, string, mixed, array{assistant_message: ?Message, failed: bool}>
+     * @return Generator<int, string, mixed, array{assistant_message: ?Message, failed: bool, connection_failed: bool}>
      */
     public function stream(
         Conversation $conversation,

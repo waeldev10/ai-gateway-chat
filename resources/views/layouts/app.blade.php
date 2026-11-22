@@ -28,7 +28,6 @@
         @include('components.theme.theme-init')
         @include('components.theme.ui-colors')
 
-        @fonts
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
         @livewireStyles

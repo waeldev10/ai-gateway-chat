@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
+/** يبني سجل الرسائل المكتملة ضمن حدود سياق الذكاء الاصطناعي، ويحدد الرسائل التالية أو يحذفها. */
 class MessageContextService
 {
     public function completedHistory(
@@ -131,13 +132,5 @@ class MessageContextService
                         ->where('id', '>', $message->getKey());
                 });
         });
-    }
-
-    public function latestMessage(Conversation $conversation): ?Message
-    {
-        return $conversation->messages()
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->first();
     }
 }

@@ -34,11 +34,12 @@ function expectRequestWithPersona(string $systemPrompt): Closure
     ]);
 }
 
-it('uses the explicitly selected persona for a new message', function () {
+it('uses the active persona automatically for a new message', function () {
     $user = User::factory()->create();
     $conversation = Conversation::factory()->for($user)->create();
     $persona = AiPersona::factory()->for($user)->create([
         'system_prompt' => 'You are a pirate. Answer in pirate language.',
+        'is_active' => true,
     ]);
 
     $this->mock(AiService::class, function (MockInterface $mock) use ($persona): void {
@@ -51,114 +52,17 @@ it('uses the explicitly selected persona for a new message', function () {
     $this->actingAs($user, 'sanctum')
         ->postJson("/api/v1/conversations/{$conversation->id}/messages", [
             'content' => 'Hello',
-            'persona_id' => $persona->id,
         ])
         ->assertCreated()
         ->assertJsonPath('data.assistant_message.content', 'Ahoy!');
 });
 
-it('falls back to the most recently updated active persona', function () {
-    $user = User::factory()->create();
-    $conversation = Conversation::factory()->for($user)->create();
-
-    AiPersona::factory()->for($user)->create([
-        'system_prompt' => 'Older prompt.',
-        'updated_at' => now()->subHour(),
-    ]);
-    $newestActive = AiPersona::factory()->for($user)->create([
-        'system_prompt' => 'Newest active prompt.',
-        'updated_at' => now()->subMinute(),
-    ]);
-    AiPersona::factory()->for($user)->inactive()->create([
-        'system_prompt' => 'Newest inactive prompt.',
-        'updated_at' => now(),
-    ]);
-
-    $this->mock(AiService::class, function (MockInterface $mock) use ($newestActive): void {
-        $mock->shouldReceive('generate')
-            ->once()
-            ->with(expectRequestWithPersona($newestActive->system_prompt))
-            ->andReturn(new AiResponse('Response', 'openai', 'gpt-test'));
-    });
-
-    $this->actingAs($user, 'sanctum')
-        ->postJson("/api/v1/conversations/{$conversation->id}/messages", [
-            'content' => 'Hello',
-        ])
-        ->assertCreated();
-});
-
-it('rejects an inactive selected persona', function () {
-    $user = User::factory()->create();
-    $conversation = Conversation::factory()->for($user)->create();
-    $persona = AiPersona::factory()->for($user)->inactive()->create();
-
-    $this->mock(AiService::class, function (MockInterface $mock): void {
-        $mock->shouldNotReceive('generate');
-    });
-
-    $this->actingAs($user, 'sanctum')
-        ->postJson("/api/v1/conversations/{$conversation->id}/messages", [
-            'content' => 'Hello',
-            'persona_id' => $persona->id,
-        ])
-        ->assertUnprocessable()
-        ->assertJsonPath('code', 'validation_failed')
-        ->assertJsonPath('errors.persona_id.0', 'الشخصية المحددة غير متاحة.');
-
-    expect($conversation->messages()->count())->toBe(0);
-});
-
-it('rejects another user selected persona', function () {
-    $user = User::factory()->create();
-    $conversation = Conversation::factory()->for($user)->create();
-    $persona = AiPersona::factory()->create();
-
-    $this->mock(AiService::class, function (MockInterface $mock): void {
-        $mock->shouldNotReceive('generate');
-    });
-
-    $this->actingAs($user, 'sanctum')
-        ->postJson("/api/v1/conversations/{$conversation->id}/messages", [
-            'content' => 'Hello',
-            'persona_id' => $persona->id,
-        ])
-        ->assertUnprocessable()
-        ->assertJsonPath('errors.persona_id.0', 'الشخصية المحددة غير متاحة.');
-});
-
-it('uses the selected persona when continuing a conversation', function () {
-    $user = User::factory()->create();
-    $conversation = Conversation::factory()->for($user)->create();
-    $persona = AiPersona::factory()->for($user)->create([
-        'system_prompt' => 'Continue like a historian.',
-    ]);
-
-    Message::factory()->for($conversation)->create([
-        'role' => MessageRole::User,
-        'content' => 'Tell me about Rome.',
-        'status' => MessageStatus::Complete,
-    ]);
-
-    $this->mock(AiService::class, function (MockInterface $mock) use ($persona): void {
-        $mock->shouldReceive('generate')
-            ->once()
-            ->with(expectRequestWithPersona($persona->system_prompt))
-            ->andReturn(new AiResponse('Rome was founded in 753 BC.', 'openai', 'gpt-test'));
-    });
-
-    $this->actingAs($user, 'sanctum')
-        ->postJson("/api/v1/conversations/{$conversation->id}/messages/continue", [
-            'persona_id' => $persona->id,
-        ])
-        ->assertOk();
-});
-
-it('uses the selected persona when editing a message', function () {
+it('uses the active persona automatically when editing a message', function () {
     $user = User::factory()->create();
     $conversation = Conversation::factory()->for($user)->create();
     $persona = AiPersona::factory()->for($user)->create([
         'system_prompt' => 'Answer as a poet.',
+        'is_active' => true,
     ]);
     $target = Message::factory()->for($conversation)->create([
         'role' => MessageRole::User,
@@ -176,16 +80,16 @@ it('uses the selected persona when editing a message', function () {
     $this->actingAs($user, 'sanctum')
         ->patchJson("/api/v1/conversations/{$conversation->id}/messages/{$target->id}", [
             'content' => 'Edited question',
-            'persona_id' => $persona->id,
         ])
         ->assertOk();
 });
 
-it('uses the selected persona when regenerating a reply', function () {
+it('uses the active persona automatically when regenerating a reply', function () {
     $user = User::factory()->create();
     $conversation = Conversation::factory()->for($user)->create();
     $persona = AiPersona::factory()->for($user)->create([
         'system_prompt' => 'Answer as a scientist.',
+        'is_active' => true,
     ]);
 
     Message::factory()->for($conversation)->create([
@@ -208,9 +112,31 @@ it('uses the selected persona when regenerating a reply', function () {
     });
 
     $this->actingAs($user, 'sanctum')
-        ->postJson("/api/v1/conversations/{$conversation->id}/messages/{$target->id}/regenerate", [
-            'persona_id' => $persona->id,
-        ])
+        ->postJson("/api/v1/conversations/{$conversation->id}/messages/{$target->id}/regenerate")
         ->assertOk()
         ->assertJsonPath('data.content', 'Rayleigh scattering.');
+});
+
+it('uses the system default persona when no custom persona is active', function () {
+    $user = User::factory()->create();
+    $conversation = Conversation::factory()->for($user)->create();
+    AiPersona::factory()->for($user)->inactive()->create([
+        'system_prompt' => 'Inactive instructions.',
+    ]);
+
+    $this->mock(AiService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('generate')
+            ->once()
+            ->with(Mockery::on(fn (AiRequestData $request): bool => $request->messages === withDefaultSystemPrompt([
+                ['role' => 'user', 'content' => 'Hello'],
+            ])))
+            ->andReturn(new AiResponse('Default reply.', 'openai', 'gpt-test'));
+    });
+
+    $this->actingAs($user, 'sanctum')
+        ->postJson("/api/v1/conversations/{$conversation->id}/messages", [
+            'content' => 'Hello',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.assistant_message.content', 'Default reply.');
 });

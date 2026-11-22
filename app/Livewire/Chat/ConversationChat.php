@@ -14,6 +14,7 @@ use App\Services\Message\MessageGenerationService;
 use App\Services\Message\MessageRegenerationService;
 use App\Services\Message\MessageService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
@@ -22,12 +23,39 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
 
+/** يدير حالة واجهة المحادثة، ويحمل الرسائل على دفعات ويفوض الإرسال والتحرير والتوليد إلى الخدمات. */
 class ConversationChat extends Component
 {
     #[Locked]
     public ?string $conversationId = null;
 
+    #[Locked]
+    public array $loadedMessageIds = [];
+
+    #[Locked]
+    public ?string $olderMessagesCreatedAt = null;
+
+    #[Locked]
+    public ?string $olderMessagesId = null;
+
+    #[Locked]
+    public bool $hasOlderMessages = false;
+
+    #[Locked]
+    public bool $shouldSendInitialMessage = false;
+
+    #[Locked]
+    public bool $isInitialSendInProgress = false;
+
+    #[Locked]
+    public ?string $initialSendContent = null;
+
+    #[Locked]
+    public bool $rateLimitAlreadyChecked = false;
+
     public string $draft = '';
+
+    private const int MESSAGES_PER_PAGE = 20;
 
     public function mount(ConversationService $conversations, ?string $conversationId = null): void
     {
@@ -43,6 +71,80 @@ class ConversationChat extends Component
         $conversation = $conversations->findFor($user, $conversationId);
         $this->authorize('view', $conversation);
         $this->conversationId = (string) $conversation->id;
+        $this->loadLatestMessages($conversation);
+
+        $initialSend = session()->pull('conversation-initial-send');
+
+        if (is_array($initialSend)
+            && ($initialSend['conversation_id'] ?? null) === $this->conversationId
+            && is_string($initialSend['content'] ?? null)) {
+            $this->initialSendContent = $initialSend['content'];
+            $this->draft = $initialSend['content'];
+            $this->rateLimitAlreadyChecked = (bool) ($initialSend['rate_limit_checked'] ?? false);
+            $this->shouldSendInitialMessage = true;
+        }
+    }
+
+    public function sendInitialMessage(MessageService $messages, ConversationService $conversations): void
+    {
+        if (! $this->shouldSendInitialMessage || $this->initialSendContent === null) {
+            return;
+        }
+
+        $this->isInitialSendInProgress = true;
+        $this->draft = $this->initialSendContent;
+        $this->initialSendContent = null;
+        $this->shouldSendInitialMessage = false;
+
+        try {
+            $this->send($messages, $conversations);
+        } finally {
+            $this->isInitialSendInProgress = false;
+        }
+    }
+
+    public function loadOlderMessages(): void
+    {
+        if (! $this->hasOlderMessages || $this->olderMessagesCreatedAt === null || $this->olderMessagesId === null) {
+            return;
+        }
+
+        $user = Auth::user();
+        abort_if($user === null, 403);
+        abort_if($this->conversationId === null, 404);
+
+        $conversation = app(ConversationService::class)->findFor($user, $this->conversationId);
+        $this->authorize('view', $conversation);
+
+        $olderMessages = $conversation->messages()
+            ->where(function (Builder $query): void {
+                $query->where('created_at', '<', $this->olderMessagesCreatedAt)
+                    ->orWhere(function (Builder $query): void {
+                        $query->where('created_at', '=', $this->olderMessagesCreatedAt)
+                            ->where('id', '<', $this->olderMessagesId);
+                    });
+            })
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit(self::MESSAGES_PER_PAGE + 1)
+            ->get();
+
+        $this->hasOlderMessages = $olderMessages->count() > self::MESSAGES_PER_PAGE;
+        $olderMessages = $olderMessages->take(self::MESSAGES_PER_PAGE)->reverse()->values();
+
+        if ($olderMessages->isEmpty()) {
+            $this->hasOlderMessages = false;
+
+            return;
+        }
+
+        $oldestMessage = $olderMessages->first();
+        $this->olderMessagesCreatedAt = $oldestMessage->created_at->toDateTimeString();
+        $this->olderMessagesId = (string) $oldestMessage->id;
+        $this->loadedMessageIds = array_values(array_unique([
+            ...$olderMessages->map(fn ($message): string => (string) $message->id)->all(),
+            ...$this->loadedMessageIds,
+        ]));
     }
 
     public function send(MessageService $messages, ConversationService $conversations): void
@@ -63,9 +165,11 @@ class ConversationChat extends Component
             return;
         }
 
+        $rateLimitAlreadyChecked = $this->rateLimitAlreadyChecked;
+        $this->rateLimitAlreadyChecked = false;
         $rateLimitKey = 'ai-stream:'.$user->getKey();
 
-        if (! RateLimiter::attempt($rateLimitKey, 20, fn (): bool => true, 60)) {
+        if (! $rateLimitAlreadyChecked && ! RateLimiter::attempt($rateLimitKey, 20, fn (): bool => true, 60)) {
             $this->dispatch(
                 'toast',
                 type: 'error',
@@ -76,16 +180,24 @@ class ConversationChat extends Component
             return;
         }
 
-        $isNew = $this->conversationId === null;
+        if ($this->conversationId === null) {
+            $conversation = $conversations->create($user, []);
+            $this->conversationId = (string) $conversation->id;
+            $this->isInitialSendInProgress = true;
 
-        $conversation = $isNew
-            ? $conversations->create($user, [])
-            : $conversations->findFor($user, (string) $this->conversationId);
+            session()->flash('conversation-initial-send', [
+                'conversation_id' => (string) $conversation->id,
+                'content' => $content,
+                'rate_limit_checked' => true,
+            ]);
 
-        if (! $isNew) {
-            $this->authorize('sendMessage', $conversation);
+            $this->redirectRoute('conversations.show', $conversation, navigate: true);
+
+            return;
         }
 
+        $conversation = $conversations->findFor($user, (string) $this->conversationId);
+        $this->authorize('sendMessage', $conversation);
         $this->conversationId = (string) $conversation->id;
         $titleBefore = $conversation->title;
 
@@ -98,8 +210,6 @@ class ConversationChat extends Component
 
             $result = $stream->getReturn();
         } catch (ConversationBusyException) {
-            $this->removeEmptyNewConversation($isNew, $conversation);
-
             $this->dispatch(
                 'toast',
                 type: 'error',
@@ -109,8 +219,6 @@ class ConversationChat extends Component
 
             return;
         } catch (ValidationException $exception) {
-            $this->removeEmptyNewConversation($isNew, $conversation);
-
             foreach ($exception->errors() as $field => $errors) {
                 $this->addError($field === 'content' ? 'draft' : $field, (string) ($errors[0] ?? ''));
             }
@@ -119,7 +227,7 @@ class ConversationChat extends Component
         } catch (Throwable $exception) {
             report($exception);
 
-            $this->removeEmptyNewConversation($isNew, $conversation);
+            $this->refreshVisibleMessages($conversation);
 
             $this->dispatch(
                 'toast',
@@ -131,36 +239,37 @@ class ConversationChat extends Component
             return;
         }
 
+        $this->refreshVisibleMessages($conversation);
         $this->draft = '';
 
         $this->dispatch('conversations-changed');
         $this->dispatch('conversation-chat-updated', id: (string) $conversation->id);
 
-        if (! $isNew) {
-            $conversation->refresh();
+        $conversation->refresh();
 
-            if (blank($titleBefore) && filled($conversation->title)) {
-                $this->dispatch('conversation-renamed', id: (string) $conversation->id, title: (string) $conversation->title);
-            }
+        if (blank($titleBefore) && filled($conversation->title)) {
+            $this->dispatch('conversation-renamed', id: (string) $conversation->id, title: (string) $conversation->title);
         }
 
         if ($result['failed']) {
+            if ($result['connection_failed'] ?? false) {
+                $this->dispatch('ai-provider-connection-failed');
+
+                return;
+            }
+
             $toast = [
                 'type' => 'error',
                 'title' => 'تعذر إكمال الرد',
                 'message' => 'تم حفظ رسالتك، لكن تعذر توليد الرد بالكامل. حاول مرة أخرى.',
             ];
 
-            if ($isNew) {
-                session()->flash('toast', $toast);
-            } else {
-                $this->dispatch('toast', ...$toast);
-            }
+            $this->dispatch('toast', ...$toast);
+
+            return;
         }
 
-        if ($isNew) {
-            $this->redirectRoute('conversations.show', $conversation, navigate: true);
-        }
+        $this->dispatch('ai-provider-connection-restored');
     }
 
     public function editMessage(MessageEditingService $editing, string $messageId, string $content): bool
@@ -210,6 +319,8 @@ class ConversationChat extends Component
         } catch (Throwable $e) {
             report($e);
 
+            $this->refreshVisibleMessages($conversation);
+
             $this->dispatch(
                 'toast',
                 type: 'error',
@@ -220,10 +331,17 @@ class ConversationChat extends Component
             return false;
         }
 
+        $this->refreshVisibleMessages($conversation);
         $this->dispatch('conversations-changed');
         $this->dispatch('conversation-chat-updated', id: (string) $conversation->id);
 
         if ($result['failed']) {
+            if ($result['connection_failed'] ?? false) {
+                $this->dispatch('ai-provider-connection-failed');
+
+                return false;
+            }
+
             $this->dispatch(
                 'toast',
                 type: 'error',
@@ -233,6 +351,8 @@ class ConversationChat extends Component
 
             return false;
         }
+
+        $this->dispatch('ai-provider-connection-restored');
 
         return true;
     }
@@ -277,6 +397,8 @@ class ConversationChat extends Component
         } catch (Throwable $e) {
             report($e);
 
+            $this->refreshVisibleMessages($conversation);
+
             $this->dispatch(
                 'toast',
                 type: 'error',
@@ -287,10 +409,17 @@ class ConversationChat extends Component
             return false;
         }
 
+        $this->refreshVisibleMessages($conversation);
         $this->dispatch('conversations-changed');
         $this->dispatch('conversation-chat-updated', id: (string) $conversation->id);
 
         if ($result['failed']) {
+            if ($result['connection_failed'] ?? false) {
+                $this->dispatch('ai-provider-connection-failed');
+
+                return false;
+            }
+
             $this->dispatch(
                 'toast',
                 type: 'error',
@@ -300,6 +429,8 @@ class ConversationChat extends Component
 
             return false;
         }
+
+        $this->dispatch('ai-provider-connection-restored');
 
         return true;
     }
@@ -329,28 +460,66 @@ class ConversationChat extends Component
             $conversation = $conversations->findFor($user, $this->conversationId);
             $this->authorize('view', $conversation);
 
-            $messages = $conversation->messages()
-                ->orderBy('created_at')
-                ->orderBy('id')
-                ->get();
+            if ($this->loadedMessageIds !== []) {
+                $messages = $conversation->messages()
+                    ->whereIn('id', $this->loadedMessageIds)
+                    ->orderBy('created_at')
+                    ->orderBy('id')
+                    ->get();
+            }
         }
 
         return view('livewire.chat.conversation-chat', [
             'conversation' => $conversation,
             'messages' => $messages,
+            'hasMessages' => $messages->isNotEmpty() || $this->shouldSendInitialMessage || $this->isInitialSendInProgress,
+            'hasOlderMessages' => $this->hasOlderMessages,
+            'initialSendContent' => $this->initialSendContent,
+            'shouldSendInitialMessage' => $this->shouldSendInitialMessage,
         ]);
     }
 
-    private function removeEmptyNewConversation(bool $isNew, Conversation $conversation): void
+    private function loadLatestMessages(Conversation $conversation): void
     {
-        if (! $isNew || $conversation->messages()->exists()) {
+        $latestMessages = $conversation->messages()
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit(self::MESSAGES_PER_PAGE + 1)
+            ->get();
+
+        $this->hasOlderMessages = $latestMessages->count() > self::MESSAGES_PER_PAGE;
+        $latestMessages = $latestMessages->take(self::MESSAGES_PER_PAGE)->reverse()->values();
+
+        $this->loadedMessageIds = $latestMessages
+            ->map(fn ($message): string => (string) $message->id)
+            ->all();
+
+        $oldestMessage = $latestMessages->first();
+        $this->olderMessagesCreatedAt = $oldestMessage?->created_at->toDateTimeString();
+        $this->olderMessagesId = $oldestMessage === null ? null : (string) $oldestMessage->id;
+    }
+
+    private function refreshVisibleMessages(Conversation $conversation): void
+    {
+        if ($this->loadedMessageIds === []) {
+            $this->loadLatestMessages($conversation);
+
             return;
         }
 
-        $deleted = rescue(fn (): ?bool => $conversation->delete(), false, report: false);
+        $latestMessageIds = $conversation->messages()
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit(2)
+            ->pluck('id')
+            ->map(fn ($id): string => (string) $id)
+            ->reverse()
+            ->values()
+            ->all();
 
-        if ($deleted) {
-            $this->conversationId = null;
-        }
+        $this->loadedMessageIds = array_values(array_unique([
+            ...$this->loadedMessageIds,
+            ...$latestMessageIds,
+        ]));
     }
 }

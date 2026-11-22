@@ -4,7 +4,7 @@
     wire:target="togglePin,rename,delete"
     @conversation-pin-requested.window="if ($event.detail.scope === @js($context)) { $wire.togglePin($event.detail.id).catch(() => window.dispatchEvent(new CustomEvent('toast', { detail: { type: 'error', title: 'تعذر تحديث التثبيت', message: 'حاول مرة أخرى.' } }))) }"
     @conversation-rename-requested.window="if ($event.detail.scope === @js($context)) { $wire.rename($event.detail.id, $event.detail.title).catch(() => window.dispatchEvent(new CustomEvent('conversation-rename-failed', { detail: { scope: @js($context), message: 'تعذر حفظ الاسم. حاول مرة أخرى.' } }))) }"
-    @conversation-delete-requested.window="if ($event.detail.scope === @js($context)) { window.dispatchEvent(new CustomEvent('open-confirm-modal', { detail: { id: @js($deleteModalId), title: 'حذف المحادثة', subject: $event.detail.title || '', payload: { ids: [$event.detail.id] } } })) }"
+    @conversation-delete-requested.window="if ($event.detail.scope === @js($context)) { const targetUrl = new URL($event.detail.url, window.location.origin); const isActive = targetUrl.pathname === window.location.pathname; window.dispatchEvent(new CustomEvent('open-confirm-modal', { detail: { id: @js($deleteModalId), title: 'حذف المحادثة', subject: $event.detail.title || '', payload: { ids: [$event.detail.id], isActive: isActive } } })) }"
 >
     @if ($conversationId !== null)
         <x-conversation.actions-menu
@@ -30,7 +30,7 @@
         <x-slot:confirm>
             <button
                 type="button"
-                @click="if (busy) return; busy = true; $wire.delete(payload?.ids?.[0] ?? null).finally(() => { busy = false; })"
+                @click="if (busy) return; busy = true; $wire.delete(payload?.ids?.[0] ?? null, payload?.isActive ?? false).finally(() => { busy = false; })"
                 :disabled="busy"
                 class="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-full bg-destructive px-5 py-2 text-xs font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
             >

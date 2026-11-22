@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
+/** يتحقق من بيانات الدخول ويبدأ جلسة المستخدم بعد نجاح المصادقة. */
 class LoginService
 {
     public function authenticate(array $credentials): ?User

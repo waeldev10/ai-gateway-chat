@@ -2,6 +2,7 @@
 
 namespace App\AI\DTOs;
 
+/** يمثل الرد الكامل بعد توحيده، مع الاتصال والنموذج وسبب الإنهاء واستهلاك الرموز. */
 final readonly class AiResponse
 {
     public function __construct(

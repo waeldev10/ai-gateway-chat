@@ -5,6 +5,7 @@ namespace App\Services\Persona;
 use App\Models\AiPersona;
 use App\Models\Conversation;
 
+/** يحل شخصية المحادثة ويضيف تعليماتها كرسالة system قبل تسليم السياق لطبقة الذكاء الاصطناعي. */
 class AiPromptService
 {
     public function __construct(

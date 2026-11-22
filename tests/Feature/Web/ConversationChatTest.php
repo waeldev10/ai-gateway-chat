@@ -7,6 +7,7 @@ use App\Enums\AiRequestStatus;
 use App\Enums\AiSource;
 use App\Enums\MessageRole;
 use App\Enums\MessageStatus;
+use App\Exceptions\AiException;
 use App\Livewire\Chat\ConversationChat;
 use App\Models\AiRequest as AiRequestRecord;
 use App\Models\Conversation;
@@ -14,6 +15,7 @@ use App\Models\User;
 use App\Services\Message\MessageContextService;
 use App\Services\Message\MessageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
@@ -83,6 +85,90 @@ it('renders an existing conversation with its messages', function () {
         ->assertSet('conversationId', (string) $conversation->id)
         ->assertSee('Hello')
         ->assertSeeHtml('<strong>there</strong>');
+});
+
+it('renders the offline notice inside the composer for new and existing conversations', function () {
+    $user = User::factory()->create();
+    $conversation = Conversation::factory()->for($user)->create();
+
+    $this->actingAs($user);
+
+    Livewire::test(ConversationChat::class)
+        ->assertSeeHtml('data-chat-offline-notice')
+        ->assertSee('لا يتوفر اتصال بالإنترنت')
+        ->assertSee('لن تُرسل الرسالة الآن. أعد الاتصال لإرسالها.')
+        ->assertSeeHtml('bg-destructive/5')
+        ->assertDontSeeHtml('providerProbeUrl')
+        ->assertDontSeeHtml('setInterval(')
+        ->assertDontSeeHtml('fetch(');
+
+    Livewire::test(ConversationChat::class, ['conversationId' => (string) $conversation->id])
+        ->assertSeeHtml('data-chat-offline-notice')
+        ->assertSee('لا يتوفر اتصال بالإنترنت')
+        ->assertSee('لن تُرسل الرسالة الآن. أعد الاتصال لإرسالها.')
+        ->assertSeeHtml('bg-destructive/5')
+        ->assertDontSeeHtml('providerProbeUrl')
+        ->assertDontSeeHtml('setInterval(')
+        ->assertDontSeeHtml('fetch(');
+});
+
+it('shows a chat-scoped connection notice when the ai provider cannot be reached', function () {
+    $user = User::factory()->create();
+    $conversation = Conversation::factory()->for($user)->create();
+
+    $this->actingAs($user);
+
+    $this->mock(AiService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('stream')
+            ->once()
+            ->andThrow(AiException::connectionFailed(
+                'openai',
+                new ConnectionException('Provider is unreachable.'),
+            ));
+    });
+
+    Livewire::test(ConversationChat::class, ['conversationId' => (string) $conversation->id])
+        ->set('draft', 'Hello')
+        ->call('send')
+        ->assertDispatched('ai-provider-connection-failed');
+
+    expect($conversation->messages()->where('role', MessageRole::User->value)->count())->toBe(1)
+        ->and($conversation->messages()->where('role', MessageRole::Assistant->value)->count())->toBe(0);
+});
+
+it('loads conversation history in batches of twenty from newest to oldest', function () {
+    $user = User::factory()->create();
+    $conversation = Conversation::factory()->for($user)->create();
+
+    foreach (range(1, 45) as $number) {
+        $conversation->messages()->create([
+            'role' => MessageRole::User,
+            'content' => 'History message '.$number,
+            'status' => MessageStatus::Complete,
+            'created_at' => now()->addSeconds($number),
+        ]);
+    }
+
+    $this->actingAs($user);
+
+    $component = Livewire::test(ConversationChat::class, ['conversationId' => (string) $conversation->id])
+        ->assertSet('hasOlderMessages', true)
+        ->assertSee('History message 26')
+        ->assertSee('History message 45')
+        ->assertDontSee('History message 25')
+        ->assertSeeHtml('data-older-messages-sentinel');
+
+    $component->call('loadOlderMessages')
+        ->assertSee('History message 6')
+        ->assertSee('History message 25')
+        ->assertDontSee('History message 5')
+        ->assertSet('hasOlderMessages', true);
+
+    $component->call('loadOlderMessages')
+        ->assertSee('History message 1')
+        ->assertSee('History message 45')
+        ->assertSet('hasOlderMessages', false)
+        ->assertDontSeeHtml('data-older-messages-sentinel');
 });
 
 it('escapes user html and sanitizes assistant markdown', function () {
@@ -170,27 +256,43 @@ it('sends a message on an existing conversation', function () {
         ->and($conversation->messages()->where('role', MessageRole::Assistant->value)->sole()->content)->toBe('Hello back');
 });
 
-it('creates a conversation from the first message and redirects', function () {
+it('redirects immediately after the first message and streams it on the conversation page', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user);
-    mockStreamedReply(['Welcome'], 'Welcome title');
 
     $component = Livewire::test(ConversationChat::class)
         ->set('draft', 'First message')
-        ->call('send')
-        ->assertSet('draft', '')
-        ->assertDispatched('conversations-changed')
-        ->assertDispatched('conversation-chat-updated');
+        ->call('send');
 
     $conversation = Conversation::query()->sole();
 
-    expect($conversation->user_id)->toBe($user->id)
-        ->and($conversation->title)->toBe('Welcome title')
-        ->and($conversation->messages()->count())->toBe(2);
-
-    $component->assertSet('conversationId', (string) $conversation->id)
+    $component
+        ->assertSet('conversationId', (string) $conversation->id)
+        ->assertSet('isInitialSendInProgress', true)
         ->assertRedirect(route('conversations.show', $conversation));
+
+    expect($conversation->user_id)->toBe($user->id)
+        ->and($conversation->title)->toBeNull()
+        ->and($conversation->messages()->count())->toBe(0)
+        ->and(RateLimiter::attempts('ai-stream:'.$user->getKey()))->toBe(1);
+
+    mockStreamedReply(['Welcome'], 'Welcome title');
+
+    Livewire::test(ConversationChat::class, ['conversationId' => (string) $conversation->id])
+        ->assertSet('shouldSendInitialMessage', true)
+        ->assertSet('draft', 'First message')
+        ->assertSeeHtml('data-chat-active="true"')
+        ->call('sendInitialMessage')
+        ->assertSet('shouldSendInitialMessage', false)
+        ->assertSet('draft', '')
+        ->assertSee('First message')
+        ->assertSee('Welcome')
+        ->assertNoRedirect();
+
+    expect($conversation->fresh()->title)->toBe('Welcome title')
+        ->and($conversation->messages()->count())->toBe(2)
+        ->and(RateLimiter::attempts('ai-stream:'.$user->getKey()))->toBe(1);
 });
 
 it('names an untitled conversation after the first message', function () {
@@ -210,10 +312,17 @@ it('names an untitled conversation after the first message', function () {
     expect($conversation->fresh()->title)->toBe('First words title');
 });
 
-it('removes the empty conversation when sending fails before the reply starts', function () {
+it('keeps the new conversation page open and preserves the draft if its first generation fails', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user);
+
+    Livewire::test(ConversationChat::class)
+        ->set('draft', 'Hello')
+        ->call('send')
+        ->assertRedirect(route('conversations.show', Conversation::query()->sole()));
+
+    $conversation = Conversation::query()->sole();
 
     $this->mock(MessageService::class, function (MockInterface $mock): void {
         $mock->shouldReceive('stream')
@@ -221,15 +330,15 @@ it('removes the empty conversation when sending fails before the reply starts', 
             ->andThrow(new RuntimeException('stream failed'));
     });
 
-    Livewire::test(ConversationChat::class)
-        ->set('draft', 'Hello')
-        ->call('send')
+    Livewire::test(ConversationChat::class, ['conversationId' => (string) $conversation->id])
+        ->call('sendInitialMessage')
         ->assertSet('draft', 'Hello')
-        ->assertSet('conversationId', null)
+        ->assertSet('conversationId', (string) $conversation->id)
         ->assertDispatched('toast', type: 'error')
         ->assertNoRedirect();
 
-    expect(Conversation::query()->count())->toBe(0);
+    expect($conversation->fresh())->not->toBeNull()
+        ->and($conversation->messages()->count())->toBe(0);
 });
 
 it('rejects an empty draft without creating a conversation', function () {
@@ -379,7 +488,8 @@ it('mounts the send draft and an in-place target for regeneration', function () 
 
     Livewire::test(ConversationChat::class, ['conversationId' => (string) $conversation->id])
         ->assertSeeHtml('wire:stream="assistant-draft"')
-        ->assertSeeHtml('wire:target="send"')
+        ->assertSeeHtml('wire:target="send,sendInitialMessage"')
+        ->assertSeeHtml('class="flex w-full items-start gap-3" dir="rtl"')
         ->assertSeeHtml('data-assistant-draft')
         ->assertSeeHtml('wire:stream="assistant-regeneration-'.$assistant->id.'"')
         ->assertSeeHtml('data-assistant-regeneration')

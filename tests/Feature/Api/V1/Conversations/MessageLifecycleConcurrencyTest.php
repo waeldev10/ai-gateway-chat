@@ -30,108 +30,13 @@ beforeEach(function () {
 });
 
 describe('continuation lifecycle', function () {
-    it('rejects continuation while the latest message is pending', function () {
+    it('does not expose a continuation endpoint', function () {
         $user = User::factory()->create();
         $conversation = Conversation::factory()->for($user)->create();
-
-        Message::factory()->for($conversation)->create([
-            'role' => MessageRole::User,
-            'content' => 'Answered question',
-            'status' => MessageStatus::Complete,
-            'created_at' => now()->subMinute(),
-        ]);
-        Message::factory()->for($conversation)->create([
-            'role' => MessageRole::Assistant,
-            'content' => 'Unfinished answer',
-            'status' => MessageStatus::Pending,
-            'created_at' => now(),
-        ]);
-
-        $this->mock(AiService::class, function (MockInterface $mock): void {
-            $mock->shouldNotReceive('generate');
-        });
 
         $this->actingAs($user, 'sanctum')
             ->postJson("/api/v1/conversations/{$conversation->id}/messages/continue")
-            ->assertUnprocessable()
-            ->assertJsonPath('code', 'validation_failed')
-            ->assertJsonPath('errors.conversation.0', 'لا يمكن متابعة المحادثة لأن آخر رسالة قيد المعالجة.');
-
-        expect($conversation->messages()->count())->toBe(2)
-            ->and(AiRequestRecord::query()->count())->toBe(0);
-    });
-
-    it('rejects continuation while another operation holds the conversation lock', function () {
-        $user = User::factory()->create();
-        $conversation = Conversation::factory()->for($user)->create();
-
-        Message::factory()->for($conversation)->create([
-            'role' => MessageRole::User,
-            'content' => 'Question',
-            'status' => MessageStatus::Complete,
-        ]);
-
-        $this->mock(AiService::class, function (MockInterface $mock): void {
-            $mock->shouldNotReceive('generate');
-        });
-
-        $lock = Cache::lock(ConversationOperationLock::key($conversation), 30);
-
-        expect($lock->get())->toBeTrue();
-
-        try {
-            $this->actingAs($user, 'sanctum')
-                ->postJson("/api/v1/conversations/{$conversation->id}/messages/continue")
-                ->assertStatus(409)
-                ->assertJsonPath('title', 'Conversation Busy')
-                ->assertJsonPath('code', 'conversation_busy');
-        } finally {
-            $lock->release();
-        }
-
-        expect($conversation->messages()->count())->toBe(1)
-            ->and(AiRequestRecord::query()->count())->toBe(0);
-    });
-
-    it('does not persist an assistant message when continuation persistence fails', function () {
-        $user = User::factory()->create();
-        $conversation = Conversation::factory()->for($user)->create();
-        $persistenceException = new RuntimeException('Unable to persist the continuation.');
-
-        Message::factory()->for($conversation)->create([
-            'role' => MessageRole::User,
-            'content' => 'Question',
-            'status' => MessageStatus::Complete,
-        ]);
-
-        $this->mock(AiService::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('generate')
-                ->once()
-                ->andReturn(new AiResponse('Generated answer', 'openai', 'gpt-test'));
-        });
-
-        Message::creating(function () use ($persistenceException): void {
-            throw $persistenceException;
-        });
-
-        $this->withoutExceptionHandling();
-
-        $caught = null;
-
-        try {
-            $this->actingAs($user, 'sanctum')
-                ->postJson("/api/v1/conversations/{$conversation->id}/messages/continue");
-        } catch (RuntimeException $exception) {
-            $caught = $exception;
-        }
-
-        expect($caught)->toBe($persistenceException)
-            ->and($conversation->messages()->count())->toBe(1);
-
-        $aiRequest = AiRequestRecord::query()->sole();
-
-        expect($aiRequest->status)->toBe(AiRequestStatus::Failed)
-            ->and($aiRequest->message_id)->toBeNull();
+            ->assertMethodNotAllowed();
     });
 });
 
@@ -442,14 +347,14 @@ describe('send lifecycle', function () {
 
         try {
             $this->actingAs($user, 'sanctum')
-                ->postJson("/api/v1/conversations/{$otherConversation->id}/messages/continue")
-                ->assertOk()
-                ->assertJsonPath('data.content', 'Other answer');
+                ->postJson("/api/v1/conversations/{$otherConversation->id}/messages", ['content' => 'Next question'])
+                ->assertCreated()
+                ->assertJsonPath('data.assistant_message.content', 'Other answer');
         } finally {
             $lock->release();
         }
 
-        expect($otherConversation->messages()->count())->toBe(2)
+        expect($otherConversation->messages()->count())->toBe(3)
             ->and($busyConversation->messages()->count())->toBe(0);
     });
 });

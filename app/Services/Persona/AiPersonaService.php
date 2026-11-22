@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
+/** يدير الشخصيات الافتراضية والمخصصة، بما يشمل التحقق والصلاحيات والتخزين المؤقت واختيار شخصية المحادثة. */
 class AiPersonaService
 {
     private const CACHE_TTL_SECONDS = 3600;
@@ -94,6 +95,12 @@ class AiPersonaService
                 ]);
             }
 
+            if ($isActive) {
+                $user->aiPersonas()
+                    ->where('is_active', true)
+                    ->update(['is_active' => false]);
+            }
+
             return $user->aiPersonas()->create([
                 'name' => $name,
                 'system_prompt' => $systemPrompt,
@@ -130,9 +137,12 @@ class AiPersonaService
         }
 
         if ($changes !== []) {
-            $persona->update($changes);
+            if (($changes['is_active'] ?? false) === true) {
+                return $this->activateExclusively($user, $persona, $changes);
+            }
 
-            $this->forgetPersonaCaches((string) $user->getKey(), (string) $persona->getKey());
+            $persona->update($changes);
+            $this->forgetActiveCustom((string) $user->getKey());
         }
 
         return $persona;
@@ -142,13 +152,7 @@ class AiPersonaService
     {
         $this->assertMutable($user, $persona);
 
-        if (! $persona->is_active) {
-            $persona->update(['is_active' => true]);
-
-            $this->forgetPersonaCaches((string) $user->getKey(), (string) $persona->getKey());
-        }
-
-        return $persona;
+        return $this->activateExclusively($user, $persona, ['is_active' => true]);
     }
 
     public function deactivate(User $user, AiPersona $persona): AiPersona
@@ -156,12 +160,21 @@ class AiPersonaService
         $this->assertMutable($user, $persona);
 
         if ($persona->is_active) {
-            $persona->update(['is_active' => false]);
+            DB::transaction(function () use ($user, $persona): void {
+                User::query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
 
-            $this->forgetPersonaCaches((string) $user->getKey(), (string) $persona->getKey());
+                $lockedPersona = $user->aiPersonas()
+                    ->whereKey($persona->getKey())
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $lockedPersona->update(['is_active' => false]);
+            });
+
+            $this->forgetActiveCustom((string) $user->getKey());
         }
 
-        return $persona;
+        return $persona->refresh();
     }
 
     public function delete(User $user, AiPersona $persona): void
@@ -170,7 +183,7 @@ class AiPersonaService
 
         $persona->delete();
 
-        $this->forgetPersonaCaches((string) $user->getKey(), (string) $persona->getKey());
+        $this->forgetActiveCustom((string) $user->getKey());
     }
 
     public function resolveForConversation(Conversation $conversation, ?AiPersona $selected = null): AiPersona
@@ -182,37 +195,6 @@ class AiPersonaService
         $active = $this->activeCustomPersonas((string) $conversation->user_id)->first();
 
         return $active ?? $this->systemDefault();
-    }
-
-    public function resolveForRequest(User $user, ?string $personaId): ?AiPersona
-    {
-        $personaId = is_string($personaId) ? trim($personaId) : '';
-
-        if ($personaId === '') {
-            return null;
-        }
-
-        if (! Str::isUlid($personaId)) {
-            throw ValidationException::withMessages([
-                'persona_id' => 'الشخصية المحددة غير متاحة.',
-            ]);
-        }
-
-        $persona = $this->findForUser($user, $personaId);
-
-        if ($persona === null || ! $this->isVisibleTo($user, $persona)) {
-            throw ValidationException::withMessages([
-                'persona_id' => 'الشخصية المحددة غير متاحة.',
-            ]);
-        }
-
-        if (! $persona->isSystemDefault() && ! $persona->is_active) {
-            throw ValidationException::withMessages([
-                'persona_id' => 'الشخصية المحددة غير متاحة.',
-            ]);
-        }
-
-        return $persona;
     }
 
     public function selectableFor(User $user, AiPersona $persona): AiPersona
@@ -264,31 +246,6 @@ class AiPersonaService
         return $personas;
     }
 
-    private function findForUser(User $user, string $personaId): ?AiPersona
-    {
-        $key = $this->lookupCacheKey((string) $user->getKey(), $personaId);
-        $cached = Cache::get($key);
-
-        if (is_array($cached)) {
-            return $this->hydratePersona($cached);
-        }
-
-        $persona = AiPersona::query()->whereKey($personaId)->first();
-
-        if ($persona !== null && $this->isVisibleTo($user, $persona)) {
-            Cache::put($key, $persona->getAttributes(), self::CACHE_TTL_SECONDS);
-        }
-
-        return $persona;
-    }
-
-    private function forgetPersonaCaches(string $userId, string $personaId): void
-    {
-        $this->forgetActiveCustom($userId);
-
-        Cache::forget($this->lookupCacheKey($userId, $personaId));
-    }
-
     private function forgetActiveCustom(string $userId): void
     {
         Cache::forget($this->activeCustomCacheKey($userId));
@@ -297,11 +254,6 @@ class AiPersonaService
     private function activeCustomCacheKey(string $userId): string
     {
         return 'ai.personas.active.'.$userId;
-    }
-
-    private function lookupCacheKey(string $userId, string $personaId): string
-    {
-        return 'ai.personas.lookup.'.$userId.'.'.$personaId;
     }
 
     private function hydratePersona(array $attributes): AiPersona
@@ -318,6 +270,35 @@ class AiPersonaService
         if (! $persona->isOwnedBy($user)) {
             throw new AuthorizationException('You do not own this persona.');
         }
+    }
+
+    /**
+     * Make one custom persona active for the user and deactivate every other
+     * custom persona in the same transaction.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function activateExclusively(User $user, AiPersona $persona, array $attributes): AiPersona
+    {
+        DB::transaction(function () use ($user, $persona, $attributes): void {
+            User::query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
+
+            $user->aiPersonas()
+                ->whereKeyNot($persona->getKey())
+                ->where('is_active', true)
+                ->update(['is_active' => false]);
+
+            $lockedPersona = $user->aiPersonas()
+                ->whereKey($persona->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $lockedPersona->update($attributes);
+        });
+
+        $this->forgetActiveCustom((string) $user->getKey());
+
+        return $persona->refresh();
     }
 
     private function normalizeName(string $name): string
